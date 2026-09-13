@@ -3,12 +3,19 @@ name: MercuryEdge Scan
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 8 * * 1-5"
+    # 09:30, 14:30 and 19:30 WAT on Mon-Thu.
+    # Friday intentionally stops after the 14:30 WAT scan to avoid the
+    # late-Friday liquidity deterioration before the US close.
+    - cron: "30 8 * * 1-4"
     - cron: "30 13 * * 1-5"
-    - cron: "30 18 * * 1-5"
+    - cron: "30 18 * * 1-4"
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: mercuryedge-scan
+  cancel-in-progress: false
 
 jobs:
   scan:
@@ -35,3 +42,15 @@ jobs:
           MERCURY_INTERVAL: 1h
           MERCURY_MAX_SETUPS: 5
         run: python -m mercuryedge
+
+      - name: Persist signal journal
+        run: |
+          if [ -f data/journal.jsonl ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/journal.jsonl
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: update MercuryEdge signal journal"
+              git push
+            fi
+          fi
