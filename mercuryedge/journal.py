@@ -6,7 +6,7 @@ from pathlib import Path
 JOURNAL_PATH = Path("data/journal.jsonl")
 
 
-def record_signal(market, setup: dict) -> None:
+def record_signal(market, setup: dict, news=None) -> None:
     JOURNAL_PATH.parent.mkdir(parents=True, exist_ok=True)
     row = {
         "market": market.name,
@@ -23,6 +23,8 @@ def record_signal(market, setup: dict) -> None:
         "rr1": setup["rr1"],
         "rr2": setup["rr2"],
         "signal_time": setup["timestamp"],
+        "news_risk": news.label if news else None,
+        "news_reason": news.reason if news else None,
         "status": "OPEN",
     }
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
