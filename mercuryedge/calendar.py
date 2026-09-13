@@ -52,28 +52,31 @@ def major_us_market_holidays(year: int) -> set[date]:
 
     holidays.update(
         {
-            date(year, 1, _nth_weekday(year, 1, 0, 3)),   # MLK Day
-            date(year, 2, _nth_weekday(year, 2, 0, 3)),   # Presidents Day
-            date(year, 5, _last_weekday(year, 5, 0)),     # Memorial Day
-            _easter(year) - timedelta(days=2),             # Good Friday
-            date(year, 9, _nth_weekday(year, 9, 0, 1)),   # Labor Day
-            date(year, 11, _nth_weekday(year, 11, 3, 4)), # Thanksgiving
+            date(year, 1, _nth_weekday(year, 1, 0, 3)),
+            date(year, 2, _nth_weekday(year, 2, 0, 3)),
+            date(year, 5, _last_weekday(year, 5, 0)),
+            _easter(year) - timedelta(days=2),
+            date(year, 9, _nth_weekday(year, 9, 0, 1)),
+            date(year, 11, _nth_weekday(year, 11, 3, 4)),
         }
     )
     return holidays
 
 
 def early_close_days(year: int) -> set[date]:
-    """Conservative early-close dates for US markets.
-
-    MercuryEdge skips its late scan on these dates because liquidity and
-    commodity/FX participation can deteriorate well before the official close.
-    """
+    """Conservative US-market early-close dates."""
     july4 = date(year, 7, 4)
-    independence_observed = july4 - timedelta(days=1) if july4.weekday() == 5 else july4
+    if july4.weekday() == 5:
+        july_early = july4 - timedelta(days=1)
+    elif july4.weekday() == 6:
+        july_early = july4 + timedelta(days=1)
+    else:
+        july_early = july4
+
+    thanksgiving = date(year, 11, _nth_weekday(year, 11, 3, 4))
     return {
-        independence_observed if independence_observed.weekday() < 5 else july4,
-        date(year, 11, _nth_weekday(year, 11, 3, 4)) + timedelta(days=1),
+        july_early,
+        thanksgiving + timedelta(days=1),
         date(year, 12, 24),
     }
 
@@ -85,12 +88,10 @@ def is_major_us_holiday(day: date) -> bool:
 def trading_status(now_utc: datetime | None = None) -> tuple[bool, str]:
     """Return whether MercuryEdge should publish at the current moment.
 
-    FX trades nearly 24/5, while the commodity contracts in this project have
-    exchange-specific daily breaks and holiday schedules. The bot therefore
-    uses a conservative US/Eastern publication window: weekdays only, no major
-    US market holidays, no late Friday scans, and no late scans on early-close
-    dates. This is a signal-publication guard, not a claim that every broker's
-    instrument is closed at the exact same minute.
+    FX is generally 24/5, while commodity contracts have exchange-specific
+    daily breaks and holiday schedules. This guard is deliberately conservative
+    and controls signal publication rather than claiming every broker is closed
+    at exactly the same minute.
     """
     now = (now_utc or datetime.now(UTC)).astimezone(ET)
 
