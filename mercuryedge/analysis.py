@@ -15,19 +15,16 @@ def rsi(series: pd.Series, period: int = 14) -> pd.Series:
     avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
-    return 100 - (100 / (1 + rs))
+    value = 100 - (100 / (1 + rs))
+    value = value.mask((avg_loss == 0) & (avg_gain > 0), 100.0)
+    value = value.mask((avg_gain == 0) & (avg_loss > 0), 0.0)
+    value = value.mask((avg_gain == 0) & (avg_loss == 0), 50.0)
+    return value
 
 
 def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     prev_close = df["Close"].shift(1)
-    tr = pd.concat(
-        [
-            df["High"] - df["Low"],
-            (df["High"] - prev_close).abs(),
-            (df["Low"] - prev_close).abs(),
-        ],
-        axis=1,
-    ).max(axis=1)
+    tr = pd.concat([df["High"] - df["Low"], (df["High"] - prev_close).abs(), (df["Low"] - prev_close).abs()], axis=1).max(axis=1)
     return tr.ewm(alpha=1 / period, adjust=False).mean()
 
 
@@ -69,69 +66,29 @@ def _trend(row: pd.Series) -> tuple[str, int]:
 def analyze(df: pd.DataFrame) -> dict | None:
     if len(df) < 220:
         return None
-
     row = df.iloc[-1]
     previous = df.iloc[-2]
     trend, score = _trend(row)
     direction = None
     setup = None
-
-    # Trend continuation / pullback
     if trend == "BULLISH" and row.RSI >= 50 and row.RSI <= 72 and row.MACD > row.MACD_SIGNAL:
-        direction = "BUY"
-        setup = "TREND CONTINUATION"
-        score += 25
+        direction, setup, score = "BUY", "TREND CONTINUATION", score + 25
     elif trend == "BEARISH" and row.RSI >= 28 and row.RSI <= 50 and row.MACD < row.MACD_SIGNAL:
-        direction = "SELL"
-        setup = "TREND CONTINUATION"
-        score += 25
-
-    # Breakout confirmation gets additional weight.
+        direction, setup, score = "SELL", "TREND CONTINUATION", score + 25
     if direction == "BUY" and row.Close > row.ROLL_HIGH and previous.Close <= previous.ROLL_HIGH:
-        setup = "BREAKOUT"
-        score += 18
+        setup, score = "BREAKOUT", score + 18
     elif direction == "SELL" and row.Close < row.ROLL_LOW and previous.Close >= previous.ROLL_LOW:
-        setup = "BREAKDOWN"
-        score += 18
-
-    # Momentum confirmation.
+        setup, score = "BREAKDOWN", score + 18
     if direction == "BUY" and row.RSI > 55:
         score += 8
     elif direction == "SELL" and row.RSI < 45:
         score += 8
-
     if direction is None or not np.isfinite(row.ATR) or row.ATR <= 0:
         return None
-
-    # Structure-aware ATR stop. Targets use asymmetric multiples to preserve a
-    # meaningful second target while keeping TP1 reasonably achievable.
     entry = float(row.Close)
     stop_distance = float(row.ATR) * 1.25
     if direction == "BUY":
-        stop = entry - stop_distance
-        tp1 = entry + stop_distance * 1.15
-        tp2 = entry + stop_distance * 2.25
+        stop, tp1, tp2 = entry - stop_distance, entry + stop_distance * 1.15, entry + stop_distance * 2.25
     else:
-        stop = entry + stop_distance
-        tp1 = entry - stop_distance * 1.15
-        tp2 = entry - stop_distance * 2.25
-
-    rr1 = 1.15
-    rr2 = 2.25
-    score = min(100, score)
-
-    return {
-        "direction": direction,
-        "setup": setup,
-        "trend": trend,
-        "score": int(score),
-        "entry": entry,
-        "tp1": float(tp1),
-        "tp2": float(tp2),
-        "sl": float(stop),
-        "rr1": rr1,
-        "rr2": rr2,
-        "rsi": float(row.RSI),
-        "atr": float(row.ATR),
-        "timestamp": str(df.index[-1]),
-    }
+        stop, tp1, tp2 = entry + stop_distance, entry - stop_distance * 1.15, entry - stop_distance * 2.25
+    return {"direction": direction, "setup": setup, "trend": trend, "score": int(min(100, score)), "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop), "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR), "timestamp": str(df.index[-1])}
