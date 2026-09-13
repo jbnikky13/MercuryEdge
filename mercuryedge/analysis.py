@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+REQUIRED_OHLC = ("Open", "High", "Low", "Close")
+
 
 def ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
@@ -36,7 +38,21 @@ def macd(series: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
     return line, signal, line - signal
 
 
+def _validate_ohlc(df: pd.DataFrame) -> None:
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("market data must be a pandas DataFrame")
+    missing = [column for column in REQUIRED_OHLC if column not in df.columns]
+    if missing:
+        raise ValueError(f"market data missing required columns: {', '.join(missing)}")
+    if df.empty:
+        raise ValueError("market data is empty")
+    for column in REQUIRED_OHLC:
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            raise ValueError(f"market data column {column} must be numeric")
+
+
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    _validate_ohlc(df)
     out = df.copy()
     out["EMA20"] = ema(out["Close"], 20)
     out["EMA50"] = ema(out["Close"], 50)
@@ -66,6 +82,10 @@ def _trend(row: pd.Series) -> tuple[str, int]:
 def analyze(df: pd.DataFrame) -> dict | None:
     if len(df) < 220:
         return None
+    required = ("EMA20", "EMA50", "EMA200", "RSI", "ATR", "MACD", "MACD_SIGNAL", "ROLL_HIGH", "ROLL_LOW")
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise ValueError(f"indicator data missing required columns: {', '.join(missing)}")
     row = df.iloc[-1]
     previous = df.iloc[-2]
     trend, score = _trend(row)
