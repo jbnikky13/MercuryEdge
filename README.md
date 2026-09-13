@@ -28,9 +28,9 @@ XAUUSD, XAGUSD, USOIL, UKOIL, NATGAS, COPPER
 
 The scheduled workflow runs at **09:30, 14:30 and 19:30 WAT Monday-Thursday**, and **09:30 and 14:30 WAT on Friday**. GitHub Actions schedules are UTC, so the workflow uses UTC cron expressions and the application performs a second market-session/holiday check before scanning.
 
-The timing is deliberately conservative. FX is generally a 24/5 market, while commodity contracts have exchange-specific daily breaks and holiday schedules. CME's published 2026 FX Spot+ schedule, for example, runs Sunday-Friday with a daily break, and CME publishes instrument-specific holiday hours. MercuryEdge therefore avoids late-Friday and major-holiday conditions rather than pretending every broker and instrument has identical hours. citehttps://www.cmegroup.com/trading-hours.html
+The timing is deliberately conservative. FX is generally a 24/5 market, while commodity contracts have exchange-specific daily breaks and holiday schedules. CME publishes instrument-specific FX and commodity holiday/trading hours, so MercuryEdge avoids late-Friday and major-holiday conditions rather than pretending every broker and instrument has identical hours.
 
-US equity/market holidays are also used as a conservative liquidity filter. NYSE publishes the official yearly holiday and early-close calendar. citehttps://www.nyse.com/markets/hours-calendars
+US market holidays are also used as a conservative liquidity filter. NYSE publishes the official yearly holiday and early-close calendar.
 
 ## Architecture
 
