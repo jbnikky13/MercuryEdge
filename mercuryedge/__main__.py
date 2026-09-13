@@ -36,7 +36,7 @@ def main() -> None:
     print(f"Markets scanned: {len(MARKETS)}")
     print(f"Setups found: {len(candidates)}")
     print(f"Publishing: {len(selected)}")
-    print("=​" * 60)
+    print("=" * 60)
 
     if not selected:
         print("No qualifying setups right now.")
