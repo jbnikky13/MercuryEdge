@@ -34,10 +34,15 @@ MARKETS = [
     Market("BZ=F", "UKOIL", "commodity"),
     Market("NG=F", "NATGAS", "commodity"),
     Market("HG=F", "COPPER", "commodity"),
+    # Major indices / volatility gauges are now first-class research markets.
+    Market("^GSPC", "SPX", "index"),
+    Market("^DJI", "DJI", "index"),
+    Market("^IXIC", "NASDAQ", "index"),
+    Market("^RUT", "RUSSELL2000", "index"),
+    Market("^VIX", "VIX", "index"),
+    Market("DX-Y.NYB", "DXY", "index"),
 ]
 
-# Intraday data powers the actual setup. A separate long daily history powers
-# historical-pattern research so short signal windows do not define the model.
 PERIOD = os.getenv("MERCURY_PERIOD", "6mo")
 INTERVAL = os.getenv("MERCURY_INTERVAL", "1h")
 HISTORICAL_PERIOD = os.getenv("MERCURY_HISTORICAL_PERIOD", "10y")
