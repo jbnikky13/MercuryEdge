@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from .analysis import adaptive_modifiers, add_indicators, analyze
 from .calendar import trading_status
@@ -10,9 +11,14 @@ from .data import load_historical, load_market
 from .historical import build_context
 from .journal import record_signal
 from .news import nfp_risk, should_reduce_risk
-from .signal import format_signal, send_telegram
+from .signal import format_bulletin, send_telegram
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+
+def _signal_slot() -> str:
+    hour = datetime.now(timezone.utc).hour
+    return "morning" if hour < 11 else "afternoon" if hour < 16 else "evening"
 
 
 def main() -> None:
@@ -35,7 +41,6 @@ def main() -> None:
         frame = load_market(market.symbol)
         if not frame.empty:
             market_data[market.name] = frame
-
         history = load_historical(market.symbol)
         if not history.empty:
             market_history[market.name] = history
@@ -52,11 +57,7 @@ def main() -> None:
 
         history = market_history.get(market.name)
         context = (
-            build_context(
-                history,
-                direction=base["direction"],
-                timestamp=enriched.index[-1],
-            )
+            build_context(history, direction=base["direction"], timestamp=enriched.index[-1])
             if history is not None and not history.empty
             else None
         )
@@ -68,9 +69,7 @@ def main() -> None:
             continue
 
         crossmarket = build_crossmarket_context(
-            market.name,
-            result["direction"],
-            market_data,
+            market.name, result["direction"], market_data
         )
         result["crossmarket_score"] = crossmarket.score
         result["crossmarket_confidence"] = crossmarket.confidence
@@ -89,8 +88,6 @@ def main() -> None:
         result["adaptive_crossmarket_modifier"] = adaptive["crossmarket"]
         result["adaptive_agreement_modifier"] = adaptive["agreement"]
 
-        # Cross-market evidence confirms/challenges the setup. Learned
-        # modifiers are applied only after walk-forward approval.
         result["score"] = int(max(
             0,
             min(
@@ -111,13 +108,14 @@ def main() -> None:
 
     candidates.sort(key=lambda item: item[1]["score"], reverse=True)
     selected = candidates[:MAX_SETUPS]
+    slot = _signal_slot()
 
-    print("
-MERCURYEDGE MARKET INTELLIGENCE SCAN")
+    print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
+    print(f"Signal window: {slot}")
     print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
     print(f"Setups found: {len(candidates)}")
-    print(f"Publishing: {len(selected)}")
+    print(f"Publishing: {len(selected)}/{MAX_SETUPS}")
     print(f"Adaptive learning: {selected[0][1].get('adaptive_enabled', False) if selected else False}")
     print(f"News: {news.label}")
     print("=" * 70)
@@ -128,13 +126,16 @@ MERCURYEDGE MARKET INTELLIGENCE SCAN")
 
     for market, setup in selected:
         record_signal(market, setup, news)
-        message = format_signal(market.name, market.category, setup)
-        print(message)
-        print("=" * 70)
-        try:
-            send_telegram(message)
-        except Exception as exc:
-            logging.warning("Telegram delivery failed: %s", exc)
+
+    bulletin = format_bulletin(
+        [(market.name, market.category, setup) for market, setup in selected],
+        slot,
+    )
+    print(bulletin)
+    try:
+        send_telegram(bulletin)
+    except Exception as exc:
+        logging.warning("Telegram delivery failed: %s", exc)
 
 
 if __name__ == "__main__":
