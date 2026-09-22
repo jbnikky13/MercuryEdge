@@ -5,6 +5,7 @@ import logging
 from .analysis import add_indicators, analyze
 from .calendar import trading_status
 from .config import MARKETS, MAX_SETUPS
+from .crossmarket import build_context as build_crossmarket_context
 from .data import load_historical, load_market
 from .historical import build_context
 from .journal import record_signal
@@ -25,12 +26,24 @@ def main() -> None:
         logging.info("News risk detected: %s", news.reason)
 
     candidates = []
+    market_data = {}
+    market_history = {}
     historical_loaded = 0
 
+    # Load the market universe once so relationships can be evaluated jointly.
     for market in MARKETS:
-        logging.info("Scanning %s", market.name)
-        df = load_market(market.symbol)
-        if df.empty:
+        logging.info("Loading %s", market.name)
+        frame = load_market(market.symbol)
+        if not frame.empty:
+            market_data[market.name] = frame
+
+        history = load_historical(market.symbol)
+        if not history.empty:
+            market_history[market.name] = history
+
+    for market in MARKETS:
+        df = market_data.get(market.name)
+        if df is None or df.empty:
             continue
 
         enriched = add_indicators(df)
@@ -38,19 +51,38 @@ def main() -> None:
         if not base:
             continue
 
-        # Historical research is a modifier, not a standalone signal.
-        history = load_historical(market.symbol)
-        context = build_context(
-            history,
-            direction=base["direction"],
-            timestamp=enriched.index[-1],
-        ) if not history.empty else None
+        history = market_history.get(market.name)
+        context = (
+            build_context(
+                history,
+                direction=base["direction"],
+                timestamp=enriched.index[-1],
+            )
+            if history is not None and not history.empty
+            else None
+        )
         if context:
             historical_loaded += 1
 
         result = analyze(enriched, context)
         if not result:
             continue
+
+        crossmarket = build_crossmarket_context(
+            market.name,
+            result["direction"],
+            market_data,
+        )
+        result["crossmarket_score"] = crossmarket.score
+        result["crossmarket_confidence"] = crossmarket.confidence
+        result["crossmarket_agreement"] = crossmarket.agreement
+        result["crossmarket_observations"] = crossmarket.observations
+        result["crossmarket_relationships"] = crossmarket.relationships
+        result["crossmarket_note"] = crossmarket.note
+
+        # Cross-market evidence is intentionally bounded. It confirms or
+        # challenges a technical setup; it cannot create a setup by itself.
+        result["score"] = int(max(0, min(100, result["score"] + crossmarket.score)))
 
         if should_reduce_risk(market.category, news):
             result["score"] = max(0, result["score"] - 8)
@@ -61,8 +93,8 @@ def main() -> None:
     candidates.sort(key=lambda item: item[1]["score"], reverse=True)
     selected = candidates[:MAX_SETUPS]
 
-    print("\nMERCURYEDGE HISTORICAL INTELLIGENCE SCAN")
-    print(f"Markets scanned: {len(MARKETS)}")
+    print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
+    print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
     print(f"Setups found: {len(candidates)}")
     print(f"Publishing: {len(selected)}")
