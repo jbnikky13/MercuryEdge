@@ -25,6 +25,15 @@ def record_signal(market, setup: dict, news=None) -> None:
         "signal_time": setup["timestamp"],
         "news_risk": news.label if news else None,
         "news_reason": news.reason if news else None,
+        "historical_score": setup.get("historical_score", 0),
+        "historical_confidence": setup.get("historical_confidence", 0.0),
+        "historical_samples": setup.get("historical_samples", 0),
+        "historical_day": setup.get("historical_day"),
+        "historical_month": setup.get("historical_month"),
+        "historical_volatility": setup.get("historical_volatility"),
+        "historical_regime": setup.get("historical_regime"),
+        "historical_win_rate_3d": setup.get("historical_win_rate_3d"),
+        "historical_note": setup.get("historical_note"),
         "status": "OPEN",
     }
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
