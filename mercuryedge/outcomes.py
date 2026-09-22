@@ -31,12 +31,17 @@ def evaluate_signal(signal: dict, candles: pd.DataFrame, horizon: int = 24) -> d
     ts = pd.Timestamp(signal["signal_time"])
     if ts.tzinfo is None:
         ts = ts.tz_localize("UTC")
-    future = candles[pd.to_datetime(candles.index, utc=True) > ts].head(horizon)
+    else:
+        ts = ts.tz_convert("UTC")
 
+    future = candles[pd.to_datetime(candles.index, utc=True) > ts].head(horizon)
     if future.empty:
         return {"status": "UNRESOLVED", "reason": "No future candles"}
 
     direction = signal["direction"]
+    tp1_reached = False
+    tp1_time = None
+
     for index, candle in future.iterrows():
         if direction == "BUY":
             hit_sl = candle["Low"] <= signal["sl"]
@@ -47,13 +52,35 @@ def evaluate_signal(signal: dict, candles: pd.DataFrame, horizon: int = 24) -> d
             hit_tp2 = candle["Low"] <= signal["tp2"]
             hit_tp1 = candle["Low"] <= signal["tp1"]
 
-        # Conservative same-candle ordering: SL wins when both are touched.
+        # Conservative same-candle ordering: if SL and a target are both
+        # touched before we know intrabar order, treat the signal as stopped.
         if hit_sl:
-            return {"status": "SL", "resolved_at": str(index)}
+            return {
+                "status": "SL",
+                "resolved_at": str(index),
+                "tp1_reached": tp1_reached,
+                "tp1_at": tp1_time,
+            }
+
         if hit_tp2:
-            return {"status": "TP2", "resolved_at": str(index)}
-        if hit_tp1:
-            return {"status": "TP1", "resolved_at": str(index)}
+            return {
+                "status": "TP2",
+                "resolved_at": str(index),
+                "tp1_reached": tp1_reached or hit_tp1,
+                "tp1_at": tp1_time or (str(index) if hit_tp1 else None),
+            }
+
+        if hit_tp1 and not tp1_reached:
+            tp1_reached = True
+            tp1_time = str(index)
+
+    if tp1_reached:
+        return {
+            "status": "TP1",
+            "resolved_at": tp1_time,
+            "tp1_reached": True,
+            "tp1_at": tp1_time,
+        }
 
     return {"status": "UNRESOLVED", "resolved_at": str(future.index[-1])}
 
