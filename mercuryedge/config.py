@@ -34,7 +34,6 @@ MARKETS = [
     Market("BZ=F", "UKOIL", "commodity"),
     Market("NG=F", "NATGAS", "commodity"),
     Market("HG=F", "COPPER", "commodity"),
-    # Major indices / volatility gauges are now first-class research markets.
     Market("^GSPC", "SPX", "index"),
     Market("^DJI", "DJI", "index"),
     Market("^IXIC", "NASDAQ", "index"),
@@ -47,6 +46,9 @@ PERIOD = os.getenv("MERCURY_PERIOD", "6mo")
 INTERVAL = os.getenv("MERCURY_INTERVAL", "1h")
 HISTORICAL_PERIOD = os.getenv("MERCURY_HISTORICAL_PERIOD", "10y")
 HISTORICAL_INTERVAL = os.getenv("MERCURY_HISTORICAL_INTERVAL", "1d")
-MAX_SETUPS = int(os.getenv("MERCURY_MAX_SETUPS", "5"))
+
+# Four ranked setups are published per scheduled signal window.
+MAX_SETUPS = int(os.getenv("MERCURY_MAX_SETUPS", "4"))
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
