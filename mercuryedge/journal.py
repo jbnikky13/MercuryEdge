@@ -34,6 +34,12 @@ def record_signal(market, setup: dict, news=None) -> None:
         "historical_regime": setup.get("historical_regime"),
         "historical_win_rate_3d": setup.get("historical_win_rate_3d"),
         "historical_note": setup.get("historical_note"),
+        "crossmarket_score": setup.get("crossmarket_score", 0),
+        "crossmarket_confidence": setup.get("crossmarket_confidence", 0.0),
+        "crossmarket_agreement": setup.get("crossmarket_agreement", 0.0),
+        "crossmarket_observations": setup.get("crossmarket_observations", 0),
+        "crossmarket_relationships": list(setup.get("crossmarket_relationships", ())),
+        "crossmarket_note": setup.get("crossmarket_note"),
         "status": "OPEN",
     }
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
