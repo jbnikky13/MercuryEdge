@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from .historical import HistoricalContext
 
 REQUIRED_OHLC = ("Open", "High", "Low", "Close")
+CALIBRATION_PATH = Path("data/calibration.json")
 
 
 def ema(series: pd.Series, period: int) -> pd.Series:
@@ -29,7 +33,7 @@ def rsi(series: pd.Series, period: int = 14) -> pd.Series:
 def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     prev_close = df["Close"].shift(1)
     tr = pd.concat(
-        [df["High"] - df["Low"], (df["High"] - prev_close).abs(),
+        [df["High"] - df["Low"], (df["Close"] - prev_close).abs(),
          (df["Low"] - prev_close).abs()],
         axis=1,
     ).max(axis=1)
@@ -85,6 +89,19 @@ def _trend(row: pd.Series) -> tuple[str, int]:
     return "NEUTRAL", 0
 
 
+def _calibration_modifier(factor: str, bucket: str, minimum_samples: int = 50) -> int:
+    if not CALIBRATION_PATH.exists():
+        return 0
+    try:
+        data = json.loads(CALIBRATION_PATH.read_text(encoding="utf-8"))
+        row = data.get("factors", {}).get(factor, {}).get(bucket, {})
+        if row.get("samples", 0) < minimum_samples:
+            return 0
+        return int(np.clip(row.get("modifier", 0), -6, 6))
+    except (OSError, ValueError, TypeError):
+        return 0
+
+
 def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
     if len(df) < 220:
         return None
@@ -128,18 +145,9 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         stop, tp1, tp2 = entry + stop_distance, entry - stop_distance * 1.15, entry - stop_distance * 2.25
 
     result = {
-        "direction": direction,
-        "setup": setup,
-        "trend": trend,
-        "score": score,
-        "entry": entry,
-        "tp1": float(tp1),
-        "tp2": float(tp2),
-        "sl": float(stop),
-        "rr1": 1.15,
-        "rr2": 2.25,
-        "rsi": float(row.RSI),
-        "atr": float(row.ATR),
+        "direction": direction, "setup": setup, "trend": trend, "score": score,
+        "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop),
+        "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR),
         "timestamp": str(df.index[-1]),
         "historical_score": historical_score,
         "historical_confidence": historical.confidence if historical else 0.0,
@@ -150,5 +158,9 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
         "historical_note": historical.note if historical else "Historical engine disabled",
+        "calibration_historical_modifier": _calibration_modifier(
+            "historical", "POSITIVE" if historical_score >= 4 else "NEGATIVE" if historical_score <= -4 else "NEUTRAL"
+        ),
     }
+    result["score"] = int(np.clip(result["score"] + result["calibration_historical_modifier"], 0, 100))
     return result
