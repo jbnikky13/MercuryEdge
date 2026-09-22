@@ -18,9 +18,10 @@ def _fmt(value: float) -> str:
 def format_signal(name: str, category: str, setup: dict) -> str:
     history = setup.get("historical_win_rate_3d")
     history_rate = f"{history * 100:.1f}%" if history is not None else "N/A"
+    icon = {"forex": "💱", "commodity": "🛢️", "index": "📈"}.get(category, "📊")
     return "\n".join(
         [
-            f"{'📊' if category == 'forex' else '🪙'} {category.upper()} SETUP",
+            f"{icon} {category.upper()} SETUP",
             "",
             f"{setup['direction']} {name} @ {_fmt(setup['entry'])}",
             "",
