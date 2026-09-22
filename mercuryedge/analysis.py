@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .historical import HistoricalContext
+
 REQUIRED_OHLC = ("Open", "High", "Low", "Close")
 
 
@@ -26,7 +28,11 @@ def rsi(series: pd.Series, period: int = 14) -> pd.Series:
 
 def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     prev_close = df["Close"].shift(1)
-    tr = pd.concat([df["High"] - df["Low"], (df["High"] - prev_close).abs(), (df["Low"] - prev_close).abs()], axis=1).max(axis=1)
+    tr = pd.concat(
+        [df["High"] - df["Low"], (df["High"] - prev_close).abs(),
+         (df["Low"] - prev_close).abs()],
+        axis=1,
+    ).max(axis=1)
     return tr.ewm(alpha=1 / period, adjust=False).mean()
 
 
@@ -79,36 +85,70 @@ def _trend(row: pd.Series) -> tuple[str, int]:
     return "NEUTRAL", 0
 
 
-def analyze(df: pd.DataFrame) -> dict | None:
+def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
     if len(df) < 220:
         return None
     required = ("EMA20", "EMA50", "EMA200", "RSI", "ATR", "MACD", "MACD_SIGNAL", "ROLL_HIGH", "ROLL_LOW")
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise ValueError(f"indicator data missing required columns: {', '.join(missing)}")
+
     row = df.iloc[-1]
     previous = df.iloc[-2]
     trend, score = _trend(row)
     direction = None
     setup = None
-    if trend == "BULLISH" and row.RSI >= 50 and row.RSI <= 72 and row.MACD > row.MACD_SIGNAL:
+
+    if trend == "BULLISH" and 50 <= row.RSI <= 72 and row.MACD > row.MACD_SIGNAL:
         direction, setup, score = "BUY", "TREND CONTINUATION", score + 25
-    elif trend == "BEARISH" and row.RSI >= 28 and row.RSI <= 50 and row.MACD < row.MACD_SIGNAL:
+    elif trend == "BEARISH" and 28 <= row.RSI <= 50 and row.MACD < row.MACD_SIGNAL:
         direction, setup, score = "SELL", "TREND CONTINUATION", score + 25
+
     if direction == "BUY" and row.Close > row.ROLL_HIGH and previous.Close <= previous.ROLL_HIGH:
         setup, score = "BREAKOUT", score + 18
     elif direction == "SELL" and row.Close < row.ROLL_LOW and previous.Close >= previous.ROLL_LOW:
         setup, score = "BREAKDOWN", score + 18
+
     if direction == "BUY" and row.RSI > 55:
         score += 8
     elif direction == "SELL" and row.RSI < 45:
         score += 8
+
     if direction is None or not np.isfinite(row.ATR) or row.ATR <= 0:
         return None
+
+    historical_score = historical.score if historical else 0
+    score = int(max(0, min(100, score + historical_score)))
+
     entry = float(row.Close)
     stop_distance = float(row.ATR) * 1.25
     if direction == "BUY":
         stop, tp1, tp2 = entry - stop_distance, entry + stop_distance * 1.15, entry + stop_distance * 2.25
     else:
         stop, tp1, tp2 = entry + stop_distance, entry - stop_distance * 1.15, entry - stop_distance * 2.25
-    return {"direction": direction, "setup": setup, "trend": trend, "score": int(min(100, score)), "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop), "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR), "timestamp": str(df.index[-1])}
+
+    result = {
+        "direction": direction,
+        "setup": setup,
+        "trend": trend,
+        "score": score,
+        "entry": entry,
+        "tp1": float(tp1),
+        "tp2": float(tp2),
+        "sl": float(stop),
+        "rr1": 1.15,
+        "rr2": 2.25,
+        "rsi": float(row.RSI),
+        "atr": float(row.ATR),
+        "timestamp": str(df.index[-1]),
+        "historical_score": historical_score,
+        "historical_confidence": historical.confidence if historical else 0.0,
+        "historical_samples": historical.sample_size if historical else 0,
+        "historical_day": historical.day_of_week if historical else None,
+        "historical_month": historical.month if historical else None,
+        "historical_volatility": historical.volatility_regime if historical else None,
+        "historical_regime": historical.trend_regime if historical else None,
+        "historical_win_rate_3d": historical.win_rate_3d if historical else None,
+        "historical_note": historical.note if historical else "Historical engine disabled",
+    }
+    return result
