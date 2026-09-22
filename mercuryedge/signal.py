@@ -16,6 +16,8 @@ def _fmt(value: float) -> str:
 
 
 def format_signal(name: str, category: str, setup: dict) -> str:
+    history = setup.get("historical_win_rate_3d")
+    history_rate = f"{history * 100:.1f}%" if history is not None else "N/A"
     return "\n".join(
         [
             f"{'📊' if category == 'forex' else '🪙'} {category.upper()} SETUP",
@@ -31,6 +33,14 @@ def format_signal(name: str, category: str, setup: dict) -> str:
             f"SETUP. {setup['setup']}",
             f"SCORE. {setup['score']}/100",
             "",
+            "HISTORICAL INTELLIGENCE",
+            f"3D directional hit rate. {history_rate}",
+            f"Analogues. {setup.get('historical_samples', 0)}",
+            f"Regime. {setup.get('historical_regime') or 'N/A'} / {setup.get('historical_volatility') or 'N/A'}",
+            f"Pattern. {setup.get('historical_day') or 'N/A'} + month {setup.get('historical_month') or 'N/A'}",
+            f"History modifier. {setup.get('historical_score', 0):+d}",
+            "",
+            "Historical behavior is evidence, not a guarantee.",
             "MANAGE RISK ⚠️",
         ]
     )
