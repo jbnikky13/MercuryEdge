@@ -36,8 +36,12 @@ MARKETS = [
     Market("HG=F", "COPPER", "commodity"),
 ]
 
+# Intraday data powers the actual setup. A separate long daily history powers
+# historical-pattern research so short signal windows do not define the model.
 PERIOD = os.getenv("MERCURY_PERIOD", "6mo")
 INTERVAL = os.getenv("MERCURY_INTERVAL", "1h")
+HISTORICAL_PERIOD = os.getenv("MERCURY_HISTORICAL_PERIOD", "10y")
+HISTORICAL_INTERVAL = os.getenv("MERCURY_HISTORICAL_INTERVAL", "1d")
 MAX_SETUPS = int(os.getenv("MERCURY_MAX_SETUPS", "5"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
