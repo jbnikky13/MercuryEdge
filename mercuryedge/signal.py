@@ -18,6 +18,7 @@ def _fmt(value: float) -> str:
 def format_signal(name: str, category: str, setup: dict) -> str:
     history = setup.get("historical_win_rate_3d")
     history_rate = f"{history * 100:.1f}%" if history is not None else "N/A"
+    relations = ", ".join(setup.get("crossmarket_relationships", ())) or "N/A"
     icon = {"forex": "💱", "commodity": "🛢️", "index": "📈"}.get(category, "📊")
     return "\n".join(
         [
@@ -41,7 +42,12 @@ def format_signal(name: str, category: str, setup: dict) -> str:
             f"Pattern. {setup.get('historical_day') or 'N/A'} + month {setup.get('historical_month') or 'N/A'}",
             f"History modifier. {setup.get('historical_score', 0):+d}",
             "",
-            "Historical behavior is evidence, not a guarantee.",
+            "CROSS-MARKET INTELLIGENCE",
+            f"Confirmation. {setup.get('crossmarket_score', 0):+d}",
+            f"Agreement. {setup.get('crossmarket_agreement', 0) * 100:.0f}%",
+            f"Evidence. {relations}",
+            "",
+            "Historical/cross-market behavior is evidence, not a guarantee.",
             "MANAGE RISK ⚠️",
         ]
     )
