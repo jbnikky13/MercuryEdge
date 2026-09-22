@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from .config import MARKETS
-from .data import load_market
+from .data import load_market_window
 from .outcomes import resolve_journal
 from .walkforward import calibrate, load_outcomes
 
 
 def candle_loader(symbol: str, signal_time: str):
-    # Load a sufficiently long 1H window. Filtering to post-signal candles is
-    # handled by evaluate_signal, preventing look-ahead.
-    return load_market(symbol)
+    return load_market_window(symbol, signal_time)
 
 
 def main() -> None:
