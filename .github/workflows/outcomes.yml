@@ -28,14 +28,16 @@ jobs:
         run: pip install -r requirements.txt
       - name: Resolve signals and calibrate
         run: python -m mercuryedge.outcome_runner --horizon 24
+      - name: Run walk-forward validation
+        run: python -m mercuryedge.walkforward
       - name: Build performance report
         run: python -m mercuryedge.performance
       - name: Persist intelligence datasets
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/outcomes.jsonl data/calibration.json data/performance.json
+          git add data/outcomes.jsonl data/calibration.json data/walkforward.json data/performance.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update MercuryEdge performance intelligence"
+            git commit -m "chore: update MercuryEdge intelligence"
             git push
           fi
