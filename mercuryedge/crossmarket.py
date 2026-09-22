@@ -17,8 +17,8 @@ class CrossMarketContext:
     note: str
 
 
-# These are hypotheses, not permanent rules. The engine measures the current
-# rolling relationship before applying any directional modifier.
+# These are research hypotheses. Rolling correlation determines whether the
+# relationship is currently active; the signs are used to select related assets.
 RELATIONSHIPS = {
     "XAUUSD": {"DXY": -1, "VIX": 1},
     "XAGUSD": {"DXY": -1, "VIX": 1},
@@ -70,36 +70,33 @@ def build_context(
     if target.empty:
         return CrossMarketContext(0, 0.0, 0.0, 0, (), "Target return series unavailable")
 
-    sign = 1 if direction == "BUY" else -1
+    direction_sign = 1 if direction == "BUY" else -1
     evidence = []
     labels = []
 
-    for related_name, expected_sign in relationships.items():
+    for related_name in relationships:
         related = _returns(market_frames.get(related_name, pd.DataFrame()))
         corr = _correlation(target, related, window)
         if corr is None or abs(corr) < min_correlation:
             continue
 
-        # Recent direction of the related market, weighted by the observed
-        # rolling correlation rather than blindly trusting the hypothesis.
         recent = related.tail(3).mean()
         if not np.isfinite(recent) or recent == 0:
             continue
 
-        observed_effect = np.sign(recent) * np.sign(corr)
-        expected_effect = np.sign(expected_sign) * sign
-        agreement = float(observed_effect == expected_effect)
-
-        # Stronger correlations contribute more, but each relationship is capped.
-        evidence.append((agreement - 0.5) * min(abs(corr), 0.8))
+        # Correlation transforms the related asset's recent move into its
+        # observed effect on the target. Compare that effect to the signal.
+        observed_target_effect = np.sign(recent) * np.sign(corr)
+        evidence_sign = 1.0 if observed_target_effect == direction_sign else -1.0
+        evidence.append(evidence_sign * min(abs(corr), 0.8))
         labels.append(f"{related_name}:{corr:+.2f}")
 
     if not evidence:
         return CrossMarketContext(0, 0.0, 0.0, 0, (), "No statistically useful cross-market evidence")
 
     raw = float(np.mean(evidence))
-    score = int(round(np.clip(raw * 24, -8, 8)))
-    agreement = float(np.mean([1.0 if x > 0 else 0.0 for x in evidence]))
+    score = int(round(np.clip(raw * 10, -8, 8)))
+    agreement = float(np.mean([1.0 if value > 0 else 0.0 for value in evidence]))
     confidence = float(min(1.0, len(evidence) / 3.0) * min(1.0, abs(raw) / 0.25))
 
     return CrossMarketContext(
