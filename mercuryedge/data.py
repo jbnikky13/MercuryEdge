@@ -5,18 +5,26 @@ import logging
 import pandas as pd
 import yfinance as yf
 
-from .config import INTERVAL, PERIOD
+from .config import HISTORICAL_INTERVAL, HISTORICAL_PERIOD, INTERVAL, PERIOD
 
 log = logging.getLogger(__name__)
 
 
 def load_market(symbol: str) -> pd.DataFrame:
-    """Download OHLCV candles and return a clean single-symbol DataFrame."""
+    return _download(symbol, PERIOD, INTERVAL)
+
+
+def load_historical(symbol: str) -> pd.DataFrame:
+    """Load a longer, lower-frequency history used for pattern research."""
+    return _download(symbol, HISTORICAL_PERIOD, HISTORICAL_INTERVAL)
+
+
+def _download(symbol: str, period: str, interval: str) -> pd.DataFrame:
     try:
         df = yf.download(
             symbol,
-            period=PERIOD,
-            interval=INTERVAL,
+            period=period,
+            interval=interval,
             auto_adjust=False,
             progress=False,
             threads=False,
