@@ -105,27 +105,7 @@ def _calibration_modifier(factor: str, bucket: str, minimum_samples: int = 50) -
         return 0
 
 
-def _walkforward_approved() -> bool:
-    if not WALKFORWARD_PATH.exists():
-        return False
-    try:
-        data = json.loads(WALKFORWARD_PATH.read_text(encoding="utf-8"))
-        folds = data.get("folds", [])
-        if len(folds) < 2:
-            return False
-        comparisons = [
-            (f.get("selected_test_win_rate"), f.get("test_baseline_win_rate"))
-            for f in folds
-            if f.get("selected_test_win_rate") is not None and f.get("test_baseline_win_rate") is not None
-        ]
-        if len(comparisons) < 2:
-            return False
-        return sum(selected >= baseline for selected, baseline in comparisons) >= (len(comparisons) + 1) // 2
-    except (OSError, ValueError, TypeError):
-        return False
-
-
-def _adaptive_modifiers(historical_score: float, crossmarket_score: float, agreement: float) -> dict:
+def adaptive_modifiers(historical_score: float, crossmarket_score: float, agreement: float) -> dict:
     if not _walkforward_approved():
         return {"historical": 0, "crossmarket": 0, "agreement": 0, "enabled": False}
     buckets = {
@@ -139,6 +119,24 @@ def _adaptive_modifiers(historical_score: float, crossmarket_score: float, agree
         "agreement": _calibration_modifier("agreement", buckets["agreement"]),
         "enabled": True,
     }
+
+
+def _walkforward_approved() -> bool:
+    if not WALKFORWARD_PATH.exists():
+        return False
+    try:
+        data = json.loads(WALKFORWARD_PATH.read_text(encoding="utf-8"))
+        folds = data.get("folds", [])
+        if len(folds) < 2:
+            return False
+        comparisons = [
+            (f.get("selected_test_win_rate"), f.get("test_baseline_win_rate"))
+            for f in folds
+            if f.get("selected_test_win_rate") is not None and f.get("test_baseline_win_rate") is not None
+        ]
+        return len(comparisons) >= 2 and sum(a >= b for a, b in comparisons) >= (len(comparisons) + 1) // 2
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
@@ -174,7 +172,7 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         return None
 
     historical_score = historical.score if historical else 0
-    score = int(max(0, min(100, score + historical_score)))
+    score = int(np.clip(score + historical_score, 0, 100))
 
     entry = float(row.Close)
     stop_distance = float(row.ATR) * 1.25
@@ -183,13 +181,7 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
     else:
         stop, tp1, tp2 = entry + stop_distance, entry - stop_distance * 1.15, entry - stop_distance * 2.25
 
-    adaptive = _adaptive_modifiers(
-        historical_score,
-        0,
-        0,
-    )
-
-    result = {
+    return {
         "direction": direction, "setup": setup, "trend": trend, "score": score,
         "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop),
         "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR),
@@ -203,10 +195,4 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
         "historical_note": historical.note if historical else "Historical engine disabled",
-        "adaptive_enabled": adaptive["enabled"],
-        "adaptive_historical_modifier": adaptive["historical"],
-        "adaptive_crossmarket_modifier": 0,
-        "adaptive_agreement_modifier": 0,
     }
-    result["score"] = int(np.clip(result["score"] + adaptive["historical"], 0, 100))
-    return result
