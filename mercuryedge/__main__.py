@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from .analysis import add_indicators, analyze
+from .analysis import adaptive_modifiers, add_indicators, analyze
 from .calendar import trading_status
 from .config import MARKETS, MAX_SETUPS
 from .crossmarket import build_context as build_crossmarket_context
@@ -30,7 +30,6 @@ def main() -> None:
     market_history = {}
     historical_loaded = 0
 
-    # Load the market universe once so relationships can be evaluated jointly.
     for market in MARKETS:
         logging.info("Loading %s", market.name)
         frame = load_market(market.symbol)
@@ -80,9 +79,29 @@ def main() -> None:
         result["crossmarket_relationships"] = crossmarket.relationships
         result["crossmarket_note"] = crossmarket.note
 
-        # Cross-market evidence is intentionally bounded. It confirms or
-        # challenges a technical setup; it cannot create a setup by itself.
-        result["score"] = int(max(0, min(100, result["score"] + crossmarket.score)))
+        adaptive = adaptive_modifiers(
+            result.get("historical_score", 0),
+            crossmarket.score,
+            crossmarket.agreement,
+        )
+        result["adaptive_enabled"] = adaptive["enabled"]
+        result["adaptive_historical_modifier"] = adaptive["historical"]
+        result["adaptive_crossmarket_modifier"] = adaptive["crossmarket"]
+        result["adaptive_agreement_modifier"] = adaptive["agreement"]
+
+        # Cross-market evidence confirms/challenges the setup. Learned
+        # modifiers are applied only after walk-forward approval.
+        result["score"] = int(max(
+            0,
+            min(
+                100,
+                result["score"]
+                + crossmarket.score
+                + adaptive["historical"]
+                + adaptive["crossmarket"]
+                + adaptive["agreement"],
+            ),
+        ))
 
         if should_reduce_risk(market.category, news):
             result["score"] = max(0, result["score"] - 8)
@@ -93,11 +112,13 @@ def main() -> None:
     candidates.sort(key=lambda item: item[1]["score"], reverse=True)
     selected = candidates[:MAX_SETUPS]
 
-    print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
+    print("
+MERCURYEDGE MARKET INTELLIGENCE SCAN")
     print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
     print(f"Setups found: {len(candidates)}")
     print(f"Publishing: {len(selected)}")
+    print(f"Adaptive learning: {selected[0][1].get('adaptive_enabled', False) if selected else False}")
     print(f"News: {news.label}")
     print("=" * 70)
 
