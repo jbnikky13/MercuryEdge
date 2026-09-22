@@ -3,12 +3,11 @@ name: MercuryEdge Scan
 on:
   workflow_dispatch:
   schedule:
-    # 09:30, 14:30 and 19:30 WAT on Mon-Thu.
-    # Friday intentionally stops after the 14:30 WAT scan to avoid the
-    # late-Friday liquidity deterioration before the US close.
-    - cron: "30 8 * * 1-4"
+    # 09:30, 14:30 and 19:30 WAT (UTC+1), Monday-Friday.
+    # Each run publishes up to four ranked setups.
+    - cron: "30 8 * * 1-5"
     - cron: "30 13 * * 1-5"
-    - cron: "30 18 * * 1-4"
+    - cron: "30 18 * * 1-5"
 
 permissions:
   contents: write
@@ -24,25 +23,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Run MercuryEdge
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MERCURY_PERIOD: 6mo
           MERCURY_INTERVAL: 1h
-          MERCURY_MAX_SETUPS: 5
+          MERCURY_MAX_SETUPS: 4
         run: python -m mercuryedge
-
       - name: Persist signal journal
         run: |
           if [ -f data/journal.jsonl ]; then
