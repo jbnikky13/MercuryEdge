@@ -10,6 +10,7 @@ from .historical import HistoricalContext
 
 REQUIRED_OHLC = ("Open", "High", "Low", "Close")
 CALIBRATION_PATH = Path("data/calibration.json")
+WALKFORWARD_PATH = Path("data/walkforward.json")
 
 
 def ema(series: pd.Series, period: int) -> pd.Series:
@@ -33,8 +34,8 @@ def rsi(series: pd.Series, period: int = 14) -> pd.Series:
 def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     prev_close = df["Close"].shift(1)
     tr = pd.concat(
-        [df["High"] - df["Low"], (df["Close"] - prev_close).abs(),
-         (df["Low"] - prev_close).abs()],
+        [df["High"] - df["Low"], (df["Low"] - prev_close).abs(),
+         (df["High"] - prev_close).abs()],
         axis=1,
     ).max(axis=1)
     return tr.ewm(alpha=1 / period, adjust=False).mean()
@@ -94,12 +95,50 @@ def _calibration_modifier(factor: str, bucket: str, minimum_samples: int = 50) -
         return 0
     try:
         data = json.loads(CALIBRATION_PATH.read_text(encoding="utf-8"))
+        if data.get("samples", 0) < minimum_samples:
+            return 0
         row = data.get("factors", {}).get(factor, {}).get(bucket, {})
         if row.get("samples", 0) < minimum_samples:
             return 0
         return int(np.clip(row.get("modifier", 0), -6, 6))
     except (OSError, ValueError, TypeError):
         return 0
+
+
+def _walkforward_approved() -> bool:
+    if not WALKFORWARD_PATH.exists():
+        return False
+    try:
+        data = json.loads(WALKFORWARD_PATH.read_text(encoding="utf-8"))
+        folds = data.get("folds", [])
+        if len(folds) < 2:
+            return False
+        comparisons = [
+            (f.get("selected_test_win_rate"), f.get("test_baseline_win_rate"))
+            for f in folds
+            if f.get("selected_test_win_rate") is not None and f.get("test_baseline_win_rate") is not None
+        ]
+        if len(comparisons) < 2:
+            return False
+        return sum(selected >= baseline for selected, baseline in comparisons) >= (len(comparisons) + 1) // 2
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _adaptive_modifiers(historical_score: float, crossmarket_score: float, agreement: float) -> dict:
+    if not _walkforward_approved():
+        return {"historical": 0, "crossmarket": 0, "agreement": 0, "enabled": False}
+    buckets = {
+        "historical": "POSITIVE" if historical_score >= 4 else "NEGATIVE" if historical_score <= -4 else "NEUTRAL",
+        "crossmarket": "POSITIVE" if crossmarket_score >= 4 else "NEGATIVE" if crossmarket_score <= -4 else "NEUTRAL",
+        "agreement": "HIGH" if agreement >= 0.67 else "LOW",
+    }
+    return {
+        "historical": _calibration_modifier("historical", buckets["historical"]),
+        "crossmarket": _calibration_modifier("crossmarket", buckets["crossmarket"]),
+        "agreement": _calibration_modifier("agreement", buckets["agreement"]),
+        "enabled": True,
+    }
 
 
 def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
@@ -144,6 +183,12 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
     else:
         stop, tp1, tp2 = entry + stop_distance, entry - stop_distance * 1.15, entry - stop_distance * 2.25
 
+    adaptive = _adaptive_modifiers(
+        historical_score,
+        0,
+        0,
+    )
+
     result = {
         "direction": direction, "setup": setup, "trend": trend, "score": score,
         "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop),
@@ -158,9 +203,10 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
         "historical_note": historical.note if historical else "Historical engine disabled",
-        "calibration_historical_modifier": _calibration_modifier(
-            "historical", "POSITIVE" if historical_score >= 4 else "NEGATIVE" if historical_score <= -4 else "NEUTRAL"
-        ),
+        "adaptive_enabled": adaptive["enabled"],
+        "adaptive_historical_modifier": adaptive["historical"],
+        "adaptive_crossmarket_modifier": 0,
+        "adaptive_agreement_modifier": 0,
     }
-    result["score"] = int(np.clip(result["score"] + result["calibration_historical_modifier"], 0, 100))
+    result["score"] = int(np.clip(result["score"] + adaptive["historical"], 0, 100))
     return result
