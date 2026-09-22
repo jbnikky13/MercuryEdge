@@ -1,0 +1,44 @@
+name: MercuryEdge Outcome Intelligence
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily after the final regular scan window.
+    - cron: "30 20 * * 1-5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mercuryedge-outcomes
+  cancel-in-progress: false
+
+jobs:
+  outcomes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Resolve signals and calibrate
+        run: python -m mercuryedge.outcome_runner --horizon 24
+
+      - name: Persist intelligence datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/outcomes.jsonl data/calibration.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update MercuryEdge outcome intelligence"
+            git push
+          fi
