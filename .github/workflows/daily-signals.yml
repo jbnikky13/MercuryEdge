@@ -2,13 +2,13 @@ name: MercuryEdge Daily Trade Signals
 
 on:
   schedule:
-    # Nigeria WAT is UTC+1 year-round.
-    # 09:30 WAT = 08:30 UTC
-    # 14:30 WAT = 13:30 UTC
-    # 19:30 WAT = 18:30 UTC
-    - cron: "30 8 * * 1-5"
-    - cron: "30 13 * * 1-5"
-    - cron: "30 18 * * 1-5"
+    # Run directly in Nigeria time so the schedule is self-documenting.
+    - cron: "30 9 * * 1-5"
+      timezone: "Africa/Lagos"
+    - cron: "30 14 * * 1-5"
+      timezone: "Africa/Lagos"
+    - cron: "30 19 * * 1-5"
+      timezone: "Africa/Lagos"
   workflow_dispatch:
 
 permissions:
@@ -43,7 +43,8 @@ jobs:
           MERCURY_INTERVAL: 1h
           MERCURY_MAX_SETUPS: 4
         run: |
-          echo "Scheduled MercuryEdge signal run: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Scheduled MercuryEdge signal run"
+          date
           python -m mercuryedge
 
       - name: Persist signal journal
