@@ -1,0 +1,59 @@
+name: MercuryEdge Daily Trade Signals
+
+on:
+  schedule:
+    # Nigeria WAT is UTC+1 year-round.
+    # 09:30 WAT = 08:30 UTC
+    # 14:30 WAT = 13:30 UTC
+    # 19:30 WAT = 18:30 UTC
+    - cron: "30 8 * * 1-5"
+    - cron: "30 13 * * 1-5"
+    - cron: "30 18 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mercuryedge-daily-signals
+  cancel-in-progress: false
+
+jobs:
+  signals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run MercuryEdge signal engine
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MERCURY_PERIOD: 6mo
+          MERCURY_INTERVAL: 1h
+          MERCURY_MAX_SETUPS: 4
+        run: |
+          echo "Scheduled MercuryEdge signal run: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          python -m mercuryedge
+
+      - name: Persist signal journal
+        run: |
+          if [ -f data/journal.jsonl ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/journal.jsonl
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: update MercuryEdge signal journal"
+              git push
+            fi
+          fi
