@@ -8,12 +8,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    # 09:30, 14:30 and 19:30 WAT (UTC+1), Monday-Friday.
-    # Each run publishes up to four ranked setups.
-    - cron: "30 8 * * 1-5"
-    - cron: "30 13 * * 1-5"
-    - cron: "30 18 * * 1-5"
 
 permissions:
   contents: write
