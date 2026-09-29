@@ -132,10 +132,9 @@ def main() -> None:
         slot,
     )
     print(bulletin)
-    try:
-        send_telegram(bulletin)
-    except Exception as exc:
-        logging.warning("Telegram delivery failed: %s", exc)
+    delivered = send_telegram(bulletin)
+    if not delivered:
+        logging.error("MercuryEdge generated a bulletin but Telegram delivery failed.")
 
 
 if __name__ == "__main__":
