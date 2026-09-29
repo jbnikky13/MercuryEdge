@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
+WAT = ZoneInfo("Africa/Lagos")
 UTC = ZoneInfo("UTC")
 
 
