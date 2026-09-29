@@ -2,6 +2,12 @@ name: MercuryEdge Scan
 
 on:
   workflow_dispatch:
+    inputs:
+      telegram_test:
+        description: "Send a Telegram connectivity test instead of running a market scan"
+        required: false
+        default: false
+        type: boolean
   schedule:
     # 09:30, 14:30 and 19:30 WAT (UTC+1), Monday-Friday.
     # Each run publishes up to four ranked setups.
@@ -30,7 +36,16 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Telegram connectivity test
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.telegram_test == true }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -c "from mercuryedge.signal import send_telegram_test; import sys; sys.exit(0 if send_telegram_test() else 1)"
+
       - name: Run MercuryEdge
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.telegram_test != true }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -39,6 +54,7 @@ jobs:
           MERCURY_MAX_SETUPS: 4
         run: python -m mercuryedge
       - name: Persist signal journal
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.telegram_test != true }}
         run: |
           if [ -f data/journal.jsonl ]; then
             git config user.name "github-actions[bot]"
