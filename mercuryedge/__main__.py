@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from .analysis import adaptive_modifiers, add_indicators, analyze
-from .calendar import trading_status
+from .calendar import WAT, trading_status
 from .config import MARKETS, MAX_SETUPS
 from .crossmarket import build_context as build_crossmarket_context
 from .data import load_historical, load_market
@@ -16,9 +16,21 @@ from .signal import format_bulletin, send_telegram
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 
-def _signal_slot() -> str:
-    hour = datetime.now(timezone.utc).hour
-    return "morning" if hour < 11 else "afternoon" if hour < 16 else "evening"
+def _signal_slot(now_utc: datetime | None = None) -> str:
+    """Return the signal window using Nigeria WAT, not runner/UTC time."""
+    now = (now_utc or datetime.now(timezone.utc)).astimezone(WAT)
+    minutes = now.hour * 60 + now.minute
+    if minutes == 9 * 60 + 30:
+        return "morning"
+    if minutes == 14 * 60 + 30:
+        return "afternoon"
+    if minutes == 19 * 60 + 30:
+        return "evening"
+    if minutes < 12 * 60:
+        return "morning"
+    if minutes < 17 * 60:
+        return "afternoon"
+    return "evening"
 
 
 def main() -> None:
