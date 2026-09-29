@@ -24,11 +24,19 @@ def load_market_window(symbol: str, start: str | None = None) -> pd.DataFrame:
     if start:
         try:
             start_ts = pd.Timestamp(start)
-            end = (start_ts + pd.Timedelta(days=14)).isoformat()
+            if start_ts.tzinfo is None:
+                start_ts = start_ts.tz_localize("UTC")
+            else:
+                start_ts = start_ts.tz_convert("UTC")
+            end_ts = start_ts + pd.Timedelta(days=14)
+            # yfinance is more reliable here with explicit UTC datetime strings
+            # than ISO strings containing the timezone offset.
+            start_arg = start_ts.strftime("%Y-%m-%d %H:%M:%S")
+            end_arg = end_ts.strftime("%Y-%m-%d %H:%M:%S")
             df = yf.download(
                 symbol,
-                start=start_ts.isoformat(),
-                end=end,
+                start=start_arg,
+                end=end_arg,
                 interval=INTERVAL,
                 auto_adjust=False,
                 progress=False,
