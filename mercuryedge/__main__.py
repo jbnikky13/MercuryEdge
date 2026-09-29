@@ -134,6 +134,14 @@ def main() -> None:
 
     if not selected:
         print("No qualifying setups right now.")
+        send_telegram(
+            "\ud83e\udde0 MERCURYEDGE\n"
+            f"{slot.upper()} SIGNAL • NO QUALIFYING SETUPS\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "No setup met the current publication criteria in this scan window.\n"
+            "No trade signal was issued.\n"
+            "Paper/research signals only."
+        )
         return
 
     for market, setup in selected:
