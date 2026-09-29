@@ -1,0 +1,21 @@
+{
+  "factors": {
+    "agreement": {},
+    "category": {},
+    "crossmarket": {},
+    "direction": {},
+    "historical": {}
+  },
+  "overall": {
+    "average_r": null,
+    "median_r": null,
+    "resolved": 0,
+    "signals": 0,
+    "sl": 0,
+    "tp1": 0,
+    "tp2": 0,
+    "unresolved": 0,
+    "win_rate": null
+  },
+  "version": 1
+}

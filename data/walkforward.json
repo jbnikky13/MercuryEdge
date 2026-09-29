@@ -1,0 +1,9 @@
+{
+  "fold_count": 0,
+  "folds": [],
+  "mean_selected_test_win_rate": null,
+  "method": "rolling_train_then_unseen_test",
+  "test_size": 20,
+  "train_size": 60,
+  "version": 1
+}
