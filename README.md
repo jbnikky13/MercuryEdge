@@ -99,6 +99,12 @@ MERCURY_INTERVAL=1h
 MERCURY_MAX_SETUPS=5
 ```
 
+## Audit-aligned signal intelligence
+
+MercuryEdge now uses a strict **24-hour outcome horizon** so live outcome tracking and Signal Auditor settlement share the same lifecycle boundary. Published Telegram signals also expose machine-readable `SCORE`, `3D HIT RATE`, `CONFIRMATION`, and `AGREEMENT` fields so outcome analysis can measure which signal characteristics were actually present at publication time.
+
+The current Signal Auditor sample is treated as calibration evidence, not as a permanent filter: no score band or cross-market rule is promoted from a small sample until it has sufficient observations and passes walk-forward validation. This prevents the system from overfitting to a handful of historical signals.
+
 ## Journal
 
 Published signals are written to:
