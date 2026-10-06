@@ -57,6 +57,18 @@ def record_signal(market, setup: dict, news=None) -> None:
         "adaptive_historical_modifier": setup.get("adaptive_historical_modifier", 0),
         "adaptive_crossmarket_modifier": setup.get("adaptive_crossmarket_modifier", 0),
         "adaptive_agreement_modifier": setup.get("adaptive_agreement_modifier", 0),
+        # Regime/execution features added by the performance upgrade.
+        "regime_adx": setup.get("regime_adx"),
+        "regime_htf_trend": setup.get("regime_htf_trend"),
+        "regime_htf_agree": setup.get("regime_htf_agree"),
+        "atr_pct": setup.get("atr_pct"),
+        "risk_pct": setup.get("risk_pct"),
+        "rr_tp1": setup.get("rr_tp1"),
+        "rr_tp2": setup.get("rr_tp2"),
+        "hour_utc": setup.get("hour_utc"),
+        "weekday": setup.get("weekday"),
+        "ccy_exposure": setup.get("ccy_exposure"),
+        "selection_filter": setup.get("selection_filter", "regime+exposure"),
         "status": "OPEN",
     }
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
@@ -66,4 +78,8 @@ def record_signal(market, setup: dict, news=None) -> None:
 def read_journal() -> list[dict]:
     if not JOURNAL_PATH.exists():
         return []
-    return [json.loads(line) for line in JOURNAL_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in JOURNAL_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
