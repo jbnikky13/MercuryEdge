@@ -47,8 +47,14 @@ INTERVAL = os.getenv("MERCURY_INTERVAL", "1h")
 HISTORICAL_PERIOD = os.getenv("MERCURY_HISTORICAL_PERIOD", "10y")
 HISTORICAL_INTERVAL = os.getenv("MERCURY_HISTORICAL_INTERVAL", "1d")
 
-# Four ranked setups are published per scheduled signal window.
 MAX_SETUPS = int(os.getenv("MERCURY_MAX_SETUPS", "4"))
+
+# Performance guardrails. Keep these environment-configurable so the live
+# strategy can be tuned from GitHub/Vercel secrets without code changes.
+MIN_ADX = float(os.getenv("MERCURY_MIN_ADX", "20"))
+REQUIRE_HTF_TREND = os.getenv("MERCURY_REQUIRE_HTF_TREND", "true").lower() in {"1", "true", "yes", "on"}
+MAX_CURRENCY_EXPOSURE = float(os.getenv("MERCURY_MAX_CURRENCY_EXPOSURE", "1.0"))
+SIGNAL_HORIZON_HOURS = int(os.getenv("MERCURY_SIGNAL_HORIZON_HOURS", "24"))
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
