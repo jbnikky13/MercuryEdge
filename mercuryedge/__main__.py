@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+import pandas as pd
 
 from .analysis import adaptive_modifiers, add_indicators, analyze
 from .calendar import WAT, trading_status
-from .config import MARKETS, MAX_SETUPS
+from .config import (
+    MARKETS,
+    MAX_CURRENCY_EXPOSURE,
+    MAX_SETUPS,
+    MIN_ADX,
+    REQUIRE_HTF_TREND,
+    SIGNAL_HORIZON_HOURS,
+)
 from .crossmarket import build_context as build_crossmarket_context
 from .data import load_historical, load_market
 from .historical import build_context
-from .journal import record_signal
+from .journal import read_journal, record_signal
 from .news import nfp_risk, should_reduce_risk
 from .signal import format_bulletin, send_telegram
+from .upgrades import build_features, select_setups
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -31,6 +41,23 @@ def _signal_slot(now_utc: datetime | None = None) -> str:
     if minutes < 17 * 60:
         return "afternoon"
     return "evening"
+
+
+def _open_signals(horizon_hours: int = 24) -> list[dict]:
+    """Only treat recent OPEN journal rows as exposure already on the book."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=horizon_hours)
+    active = []
+    for row in read_journal():
+        if row.get("status") != "OPEN":
+            continue
+        try:
+            ts = pd.Timestamp(row["signal_time"])
+            ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if ts.to_pydatetime() >= cutoff:
+            active.append(row)
+    return active
 
 
 def main() -> None:
@@ -69,7 +96,11 @@ def main() -> None:
 
         history = market_history.get(market.name)
         context = (
-            build_context(history, direction=base["direction"], timestamp=enriched.index[-1])
+            build_context(
+                history,
+                direction=base["direction"],
+                timestamp=enriched.index[-1],
+            )
             if history is not None and not history.empty
             else None
         )
@@ -100,52 +131,118 @@ def main() -> None:
         result["adaptive_crossmarket_modifier"] = adaptive["crossmarket"]
         result["adaptive_agreement_modifier"] = adaptive["agreement"]
 
-        result["score"] = int(max(
-            0,
-            min(
-                100,
-                result["score"]
-                + crossmarket.score
-                + adaptive["historical"]
-                + adaptive["crossmarket"]
-                + adaptive["agreement"],
-            ),
-        ))
+        result["score"] = int(
+            max(
+                0,
+                min(
+                    100,
+                    result["score"]
+                    + crossmarket.score
+                    + adaptive["historical"]
+                    + adaptive["crossmarket"]
+                    + adaptive["agreement"],
+                ),
+            )
+        )
 
         if should_reduce_risk(market.category, news):
             result["score"] = max(0, result["score"] - 8)
             result["news_risk"] = news.label
 
-        candidates.append((market, result))
+        # The upgrade layer receives the market's canonical display symbol
+        # (EURUSD, XAUUSD, USOIL, etc.) so currency exposure is interpretable.
+        candidates.append(
+            {
+                "symbol": market.name,
+                "direction": result["direction"],
+                "score": result["score"],
+                "_market": market,
+                "_setup": result,
+                "_frame": df,
+            }
+        )
 
-    candidates.sort(key=lambda item: item[1]["score"], reverse=True)
-    selected = candidates[:MAX_SETUPS]
+    open_signals = _open_signals(SIGNAL_HORIZON_HOURS)
+    selected_candidates, skipped = select_setups(
+        candidates,
+        market_data,
+        max_setups=MAX_SETUPS,
+        existing=open_signals,
+        min_adx=MIN_ADX,
+        require_htf=REQUIRE_HTF_TREND,
+        max_per_ccy=MAX_CURRENCY_EXPOSURE,
+    )
+
     slot = _signal_slot()
+    candidates.sort(key=lambda item: item["score"], reverse=True)
 
     print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
     print(f"Signal window: {slot}")
     print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
     print(f"Setups found: {len(candidates)}")
-    print(f"Publishing: {len(selected)}/{MAX_SETUPS}")
-    print(f"Adaptive learning: {selected[0][1].get('adaptive_enabled', False) if selected else False}")
+    print(f"Regime/exposure selected: {len(selected_candidates)}/{MAX_SETUPS}")
+    print(f"Existing open exposure: {len(open_signals)}")
+    print(f"Guardrails: ADX>={MIN_ADX:g}, 4H={'ON' if REQUIRE_HTF_TREND else 'OFF'}, currency cap={MAX_CURRENCY_EXPOSURE:g}")
+    print(f"Adaptive learning: {selected_candidates[0].get('_setup', {}).get('adaptive_enabled', False) if selected_candidates else False}")
     print(f"News: {news.label}")
     print("=" * 70)
 
-    if not selected:
-        print("No qualifying setups right now.")
+    for item in skipped:
+        logging.info(
+            "SKIPPED %s %s: %s",
+            item.get("symbol"),
+            item.get("direction"),
+            item.get("reason"),
+        )
+
+    if not selected_candidates:
+        print("No qualifying setups after regime/exposure filtering.")
         send_telegram(
-            "\ud83e\udde0 MERCURYEDGE\n"
+            "🧠 MERCURYEDGE\n"
             f"{slot.upper()} SIGNAL • NO QUALIFYING SETUPS\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "No setup met the current publication criteria in this scan window.\n"
+            "No setup passed the regime and exposure guardrails in this scan window.\n"
             "No trade signal was issued.\n"
             "Paper/research signals only."
         )
         return
 
-    for market, setup in selected:
+    selected = []
+    for item in selected_candidates:
+        market = item["_market"]
+        setup = item["_setup"]
+        frame = item["_frame"]
+
+        features = build_features(
+            market.name,
+            setup["direction"],
+            setup["entry"],
+            setup["sl"],
+            setup["tp1"],
+            setup["tp2"],
+            setup["score"],
+            frame,
+            ts=setup.get("timestamp"),
+            min_adx=MIN_ADX,
+        )
+        setup.update(
+            {
+                "regime_adx": features["adx"],
+                "regime_htf_trend": features["htf_trend"],
+                "regime_htf_agree": features["htf_agree"],
+                "atr_pct": features["atr_pct"],
+                "risk_pct": features["risk_pct"],
+                "rr_tp1": features["rr_tp1"],
+                "rr_tp2": features["rr_tp2"],
+                "hour_utc": features["hour_utc"],
+                "weekday": features["weekday"],
+                "ccy_exposure": features["ccy_exposure"],
+                "selection_filter": "adx+4h_trend+currency_exposure",
+            }
+        )
         record_signal(market, setup, news)
+        selected.append((market, setup))
 
     bulletin = format_bulletin(
         [(market.name, market.category, setup) for market, setup in selected],
