@@ -36,7 +36,7 @@ MARKETS = [
     Market("HG=F", "COPPER", "commodity"),
     Market("^GSPC", "SPX", "index"),
     Market("^DJI", "DJI", "index"),
-    Market("^IXIC", "NASDAQ", "index"),
+    Market("^NDX", "NASDAQ", "index"),
     Market("^RUT", "RUSSELL2000", "index"),
     Market("^VIX", "VIX", "index"),
     Market("DX-Y.NYB", "DXY", "index"),
