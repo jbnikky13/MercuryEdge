@@ -22,6 +22,9 @@ from .journal import read_journal, record_signal
 from .news import nfp_risk, should_reduce_risk
 from .signal import format_bulletin, send_telegram
 from .upgrades import build_features, select_setups
+from signal_filters import filter_batch
+from market_data import get_live_price
+from scheduler import BATCHES
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -30,17 +33,12 @@ def _signal_slot(now_utc: datetime | None = None) -> str:
     """Return the signal window using Nigeria WAT, not runner/UTC time."""
     now = (now_utc or datetime.now(timezone.utc)).astimezone(WAT)
     minutes = now.hour * 60 + now.minute
-    if minutes == 9 * 60 + 30:
-        return "morning"
-    if minutes == 14 * 60 + 30:
-        return "afternoon"
-    if minutes == 19 * 60 + 30:
-        return "evening"
-    if minutes < 12 * 60:
-        return "morning"
-    if minutes < 17 * 60:
-        return "afternoon"
-    return "evening"
+    for name, (hour, minute), _symbols in BATCHES:
+        if hour * 60 + minute <= minutes < hour * 60 + minute + 20:
+            return name.lower()
+    slots = [(h * 60 + m, name.lower()) for name, (h, m), _ in BATCHES]
+    due = [slot for slot in slots if slot[0] <= minutes]
+    return max(due)[1] if due else "overnight"
 
 
 def _open_signals(horizon_hours: int = 24) -> list[dict]:
@@ -174,6 +172,27 @@ def main() -> None:
     )
 
     slot = _signal_slot()
+    # Audit quality gate: block weak, paused, repeated, or feed-mismatched setups.
+    filter_candidates = []
+    candidate_by_key = {}
+    for item in selected_candidates:
+        setup = item["_setup"]
+        rate = setup.get("historical_win_rate_3d")
+        filter_sig = {
+            "symbol": item["symbol"], "direction": item["direction"],
+            "entry": setup.get("entry"), "score": setup.get("score"),
+            "hit_rate": float(rate) * 100 if rate is not None else None,
+            "analogues": setup.get("historical_samples"),
+            "regime": setup.get("historical_regime"),
+            "confirmation": setup.get("crossmarket_score", 0),
+            "tp1": setup.get("tp1"), "tp2": setup.get("tp2"), "sl": setup.get("sl"),
+        }
+        filter_candidates.append(filter_sig)
+        candidate_by_key[(item["symbol"], item["direction"])] = item
+    kept, dropped = filter_batch(filter_candidates, price_lookup=get_live_price)
+    selected_candidates = [candidate_by_key[(sig["symbol"], sig["direction"])] for sig in kept]
+    for sig, why in dropped:
+        logging.info("AUDIT FILTER DROPPED %s %s: %s", sig.get("symbol"), sig.get("direction"), why)
     candidates.sort(key=lambda item: item["score"], reverse=True)
 
     print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
