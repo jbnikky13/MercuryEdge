@@ -6,6 +6,7 @@ from signal_filters import check_signal, filter_batch
 from market_data import resolve_ticker
 from scheduler import BATCHES
 from mercuryedge.config import MARKETS
+from mercuryedge.__main__ import _restrict_to_batch
 
 
 def signal(**overrides):
@@ -80,3 +81,27 @@ def test_audit_csv_backtest_runs_from_repo_root():
     )
     assert "unfiltered" in result.stdout
     assert "filtered" in result.stdout
+
+
+
+def test_batch_universe_is_applied_before_setup_ranking():
+    candidates = [
+        {"symbol": "EURUSD", "score": 71},
+        {"symbol": "NASDAQ", "score": 99},
+        {"symbol": "VIX", "score": 98},
+    ]
+    selected_pool = _restrict_to_batch(candidates, "morning")
+    assert [item["symbol"] for item in selected_pool] == ["EURUSD"]
+
+
+def test_afternoon_batch_includes_indices_and_fx():
+    candidates = [
+        {"symbol": "EURUSD"},
+        {"symbol": "NASDAQ"},
+        {"symbol": "VIX"},
+        {"symbol": "UNKNOWN"},
+    ]
+    selected_pool = _restrict_to_batch(candidates, "afternoon")
+    assert {item["symbol"] for item in selected_pool} == {
+        "EURUSD", "NASDAQ", "VIX"
+    }
