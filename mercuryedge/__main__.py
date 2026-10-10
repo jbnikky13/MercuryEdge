@@ -41,6 +41,18 @@ def _signal_slot(now_utc: datetime | None = None) -> str:
     return max(due)[1] if due else "overnight"
 
 
+def _restrict_to_batch(candidates: list[dict], slot: str) -> list[dict]:
+    """Restrict the candidate pool before ranking/capping, so other sessions
+    cannot crowd valid setups out of the active batch.
+    """
+    batch_name = slot.upper()
+    symbols = next(
+        (symbols for name, _time, symbols in BATCHES if name == batch_name),
+        set(),
+    )
+    return [item for item in candidates if item.get("symbol") in symbols]
+
+
 def _open_signals(horizon_hours: int = 24) -> list[dict]:
     """Only treat recent OPEN journal rows as exposure already on the book."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=horizon_hours)
@@ -169,9 +181,12 @@ def main() -> None:
             }
         )
 
+    # Restrict before ranking and MAX_SETUPS so off-session markets cannot
+    # consume the slots and then be discarded afterward.
+    batch_candidates = _restrict_to_batch(candidates, slot)
     open_signals = _open_signals(SIGNAL_HORIZON_HOURS)
     selected_candidates, skipped = select_setups(
-        candidates,
+        batch_candidates,
         market_data,
         max_setups=MAX_SETUPS,
         existing=open_signals,
@@ -180,10 +195,6 @@ def main() -> None:
         max_per_ccy=MAX_CURRENCY_EXPOSURE,
     )
 
-    # Enforce the batch's market universe before applying the audit gate.
-    batch_name = slot.upper()
-    batch_symbols = next((symbols for name, _time, symbols in BATCHES if name == batch_name), set())
-    selected_candidates = [item for item in selected_candidates if item["symbol"] in batch_symbols]
     # Avoid re-sending symbols from the recent journal within the scheduler's 12h window.
     now_utc = datetime.now(timezone.utc)
     recent_symbols = {}
@@ -283,7 +294,6 @@ def main() -> None:
                 "selection_filter": "adx+4h_trend+currency_exposure",
             }
         )
-        record_signal(market, setup, news)
         selected.append((market, setup))
 
     bulletin = format_bulletin(
@@ -292,7 +302,12 @@ def main() -> None:
     )
     print(bulletin)
     delivered = send_telegram(bulletin)
-    if not delivered:
+    if delivered:
+        # Journal only published signals; failed Telegram delivery must not
+        # poison the 12-hour duplicate guard or appear as an issued setup.
+        for market, setup in selected:
+            record_signal(market, setup, news)
+    else:
         logging.error("MercuryEdge generated a bulletin but Telegram delivery failed.")
 
 
