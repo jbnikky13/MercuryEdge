@@ -59,10 +59,19 @@ def _open_signals(horizon_hours: int = 24) -> list[dict]:
 
 
 def main() -> None:
-    allowed, reason = trading_status()
-    if not allowed:
-        logging.info("MercuryEdge scan skipped: %s", reason)
-        return
+    slot = _signal_slot()
+    # Overnight and pre-London batches target FX/commodities, so don't gate them
+    # on the US cash-session calendar. Afternoon/evening retain the US-market guard.
+    if slot in {"overnight", "morning"}:
+        now_local = datetime.now(WAT)
+        if now_local.weekday() >= 5:
+            logging.info("MercuryEdge batch skipped: local weekend")
+            return
+    else:
+        allowed, reason = trading_status()
+        if not allowed:
+            logging.info("MercuryEdge scan skipped: %s", reason)
+            return
 
     news = nfp_risk()
     if news.high_impact:
@@ -171,7 +180,6 @@ def main() -> None:
         max_per_ccy=MAX_CURRENCY_EXPOSURE,
     )
 
-    slot = _signal_slot()
     # Enforce the batch's market universe before applying the audit gate.
     batch_name = slot.upper()
     batch_symbols = next((symbols for name, _time, symbols in BATCHES if name == batch_name), set())
