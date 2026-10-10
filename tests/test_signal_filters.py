@@ -1,5 +1,7 @@
 from signal_filters import check_signal, filter_batch
 from market_data import resolve_ticker
+from scheduler import BATCHES
+from mercuryedge.config import MARKETS
 
 
 def signal(**overrides):
@@ -54,3 +56,9 @@ def test_shared_feed_uses_the_strategy_tickers():
     assert resolve_ticker("^NDX") == "^NDX"
     assert resolve_ticker("USDCAD") == "CAD=X"
     assert resolve_ticker("USDCHF") == "CHF=X"
+
+
+def test_every_configured_market_is_in_a_batch():
+    configured = {market.name for market in MARKETS}
+    batched = set().union(*(symbols for _, _, symbols in BATCHES))
+    assert configured <= batched
