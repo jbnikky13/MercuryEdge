@@ -6,7 +6,7 @@ from signal_filters import check_signal, filter_batch
 from market_data import resolve_ticker
 from scheduler import BATCHES
 from mercuryedge.config import MARKETS
-from mercuryedge.__main__ import _restrict_to_batch
+from mercuryedge.__main__ import _restrict_to_batch, _signal_slot
 
 
 def signal(**overrides):
@@ -61,6 +61,8 @@ def test_shared_feed_uses_the_strategy_tickers():
     assert resolve_ticker("^NDX") == "^NDX"
     assert resolve_ticker("USDCAD") == "CAD=X"
     assert resolve_ticker("USDCHF") == "CHF=X"
+    assert resolve_ticker("EURUSD=X") == "EURUSD=X"
+    assert resolve_ticker("not-a-market") is None
 
 
 def test_every_configured_market_is_in_a_batch():
@@ -81,7 +83,6 @@ def test_audit_csv_backtest_runs_from_repo_root():
     )
     assert "unfiltered" in result.stdout
     assert "filtered" in result.stdout
-
 
 
 def test_batch_universe_is_applied_before_setup_ranking():
@@ -105,3 +106,17 @@ def test_afternoon_batch_includes_indices_and_fx():
     assert {item["symbol"] for item in selected_pool} == {
         "EURUSD", "NASDAQ", "VIX"
     }
+
+
+def test_explicit_scheduled_slot_wins_over_current_clock(monkeypatch):
+    monkeypatch.setenv("MERCURY_SIGNAL_SLOT", "evening")
+    # A midday clock must not override the scheduled workflow identity.
+    from datetime import datetime, timezone
+    assert _signal_slot(datetime(2026, 10, 12, 7, 0, tzinfo=timezone.utc)) == "evening"
+
+
+def test_invalid_explicit_slot_uses_clock_fallback(monkeypatch):
+    monkeypatch.setenv("MERCURY_SIGNAL_SLOT", "not-a-batch")
+    from datetime import datetime, timezone
+    # 06:35 WAT is 05:35 UTC and falls within the morning window.
+    assert _signal_slot(datetime(2026, 10, 12, 5, 35, tzinfo=timezone.utc)) == "morning"
