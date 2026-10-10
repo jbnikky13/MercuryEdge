@@ -23,4 +23,4 @@ jobs:
       - name: Check Yahoo Finance data path (read-only)
         env:
           PYTHONPATH: .
-      run: python market_data_smoke_test.py
+        run: python market_data_smoke_test.py
