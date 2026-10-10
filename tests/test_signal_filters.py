@@ -1,3 +1,7 @@
+import subprocess
+import sys
+from pathlib import Path
+
 from signal_filters import check_signal, filter_batch
 from market_data import resolve_ticker
 from scheduler import BATCHES
@@ -62,3 +66,17 @@ def test_every_configured_market_is_in_a_batch():
     configured = {market.name for market in MARKETS}
     batched = set().union(*(symbols for _, _, symbols in BATCHES))
     assert configured <= batched
+
+
+def test_audit_csv_backtest_runs_from_repo_root():
+    csv_path = Path(__file__).resolve().parents[1] / "audit-results.csv"
+    assert csv_path.exists()
+    result = subprocess.run(
+        [sys.executable, "signal_filters.py", str(csv_path)],
+        cwd=csv_path.parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "unfiltered" in result.stdout
+    assert "filtered" in result.stdout
