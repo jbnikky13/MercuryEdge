@@ -172,6 +172,21 @@ def main() -> None:
     )
 
     slot = _signal_slot()
+    # Enforce the batch's market universe before applying the audit gate.
+    batch_name = slot.upper()
+    batch_symbols = next((symbols for name, _time, symbols in BATCHES if name == batch_name), set())
+    selected_candidates = [item for item in selected_candidates if item["symbol"] in batch_symbols]
+    # Avoid re-sending symbols from the recent journal within the scheduler's 12h window.
+    now_utc = datetime.now(timezone.utc)
+    recent_symbols = {}
+    for row in read_journal():
+        try:
+            sent_at = pd.Timestamp(row.get("signal_time"))
+            sent_at = sent_at.tz_localize("UTC") if sent_at.tzinfo is None else sent_at.tz_convert("UTC")
+            if now_utc - sent_at.to_pydatetime() < timedelta(hours=12):
+                recent_symbols[row.get("market") or row.get("symbol")] = 1
+        except (TypeError, ValueError):
+            continue
     # Audit quality gate: block weak, paused, repeated, or feed-mismatched setups.
     filter_candidates = []
     candidate_by_key = {}
@@ -189,7 +204,7 @@ def main() -> None:
         }
         filter_candidates.append(filter_sig)
         candidate_by_key[(item["symbol"], item["direction"])] = item
-    kept, dropped = filter_batch(filter_candidates, price_lookup=get_live_price)
+    kept, dropped = filter_batch(filter_candidates, price_lookup=get_live_price, already_sent_today=recent_symbols)
     selected_candidates = [candidate_by_key[(sig["symbol"], sig["direction"])] for sig in kept]
     for sig, why in dropped:
         logging.info("AUDIT FILTER DROPPED %s %s: %s", sig.get("symbol"), sig.get("direction"), why)
