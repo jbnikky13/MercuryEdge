@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -22,25 +23,39 @@ from .journal import read_journal, record_signal
 from .news import nfp_risk, should_reduce_risk
 from .signal import format_bulletin, send_telegram
 from .upgrades import build_features, select_setups
+from signal_filters import filter_batch
+from market_data import get_live_price
+from scheduler import BATCHES
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 
 def _signal_slot(now_utc: datetime | None = None) -> str:
-    """Return the signal window using Nigeria WAT, not runner/UTC time."""
+    """Use the triggering cron's explicit batch; fall back to Nigeria local time."""
+    requested = os.getenv("MERCURY_SIGNAL_SLOT", "").strip().lower()
+    valid_slots = {name.lower() for name, _time, _symbols in BATCHES}
+    if requested in valid_slots:
+        return requested
     now = (now_utc or datetime.now(timezone.utc)).astimezone(WAT)
     minutes = now.hour * 60 + now.minute
-    if minutes == 9 * 60 + 30:
-        return "morning"
-    if minutes == 14 * 60 + 30:
-        return "afternoon"
-    if minutes == 19 * 60 + 30:
-        return "evening"
-    if minutes < 12 * 60:
-        return "morning"
-    if minutes < 17 * 60:
-        return "afternoon"
-    return "evening"
+    for name, (hour, minute), _symbols in BATCHES:
+        if hour * 60 + minute <= minutes < hour * 60 + minute + 20:
+            return name.lower()
+    slots = [(h * 60 + m, name.lower()) for name, (h, m), _ in BATCHES]
+    due = [slot for slot in slots if slot[0] <= minutes]
+    return max(due)[1] if due else "overnight"
+
+
+def _restrict_to_batch(candidates: list[dict], slot: str) -> list[dict]:
+    """Restrict the candidate pool before ranking/capping, so other sessions
+    cannot crowd valid setups out of the active batch.
+    """
+    batch_name = slot.upper()
+    symbols = next(
+        (symbols for name, _time, symbols in BATCHES if name == batch_name),
+        set(),
+    )
+    return [item for item in candidates if item.get("symbol") in symbols]
 
 
 def _open_signals(horizon_hours: int = 24) -> list[dict]:
@@ -61,10 +76,19 @@ def _open_signals(horizon_hours: int = 24) -> list[dict]:
 
 
 def main() -> None:
-    allowed, reason = trading_status()
-    if not allowed:
-        logging.info("MercuryEdge scan skipped: %s", reason)
-        return
+    slot = _signal_slot()
+    # Overnight and pre-London batches target FX/commodities, so don't gate them
+    # on the US cash-session calendar. Afternoon/evening retain the US-market guard.
+    if slot in {"overnight", "morning"}:
+        now_local = datetime.now(WAT)
+        if now_local.weekday() >= 5:
+            logging.info("MercuryEdge batch skipped: local weekend")
+            return
+    else:
+        allowed, reason = trading_status()
+        if not allowed:
+            logging.info("MercuryEdge scan skipped: %s", reason)
+            return
 
     news = nfp_risk()
     if news.high_impact:
@@ -162,9 +186,56 @@ def main() -> None:
             }
         )
 
+    # Restrict before ranking and MAX_SETUPS so off-session markets cannot
+    # consume the slots and then be discarded afterward.
+    batch_candidates = _restrict_to_batch(candidates, slot)
+
+    # Apply the audit gate to the complete in-session candidate pool before
+    # regime/exposure ranking and MAX_SETUPS. Otherwise a weak candidate could
+    # occupy a slot and then be rejected, hiding a stronger eligible setup.
+    now_utc = datetime.now(timezone.utc)
+    recent_symbols = {}
+    for row in read_journal():
+        try:
+            sent_at = pd.Timestamp(row.get("signal_time"))
+            sent_at = sent_at.tz_localize("UTC") if sent_at.tzinfo is None else sent_at.tz_convert("UTC")
+            age = now_utc - sent_at.to_pydatetime()
+            if timedelta(0) <= age < timedelta(hours=12):
+                recent_symbols[row.get("market") or row.get("symbol")] = 1
+        except (TypeError, ValueError):
+            continue
+
+    filter_candidates = []
+    candidate_by_key = {}
+    for item in batch_candidates:
+        setup = item["_setup"]
+        rate = setup.get("historical_win_rate_3d")
+        filter_sig = {
+            "symbol": item["symbol"], "direction": item["direction"],
+            "entry": setup.get("entry"), "score": setup.get("score"),
+            "hit_rate": float(rate) * 100 if rate is not None else None,
+            "analogues": setup.get("historical_samples"),
+            "regime": setup.get("historical_regime"),
+            "confirmation": setup.get("crossmarket_score", 0),
+            "tp1": setup.get("tp1"), "tp2": setup.get("tp2"), "sl": setup.get("sl"),
+        }
+        filter_candidates.append(filter_sig)
+        candidate_by_key[(item["symbol"], item["direction"])] = item
+
+    kept, dropped = filter_batch(
+        filter_candidates,
+        price_lookup=get_live_price,
+        already_sent_today=recent_symbols,
+    )
+    eligible_candidates = [
+        candidate_by_key[(sig["symbol"], sig["direction"])] for sig in kept
+    ]
+    for sig, why in dropped:
+        logging.info("AUDIT FILTER DROPPED %s %s: %s", sig.get("symbol"), sig.get("direction"), why)
+
     open_signals = _open_signals(SIGNAL_HORIZON_HOURS)
     selected_candidates, skipped = select_setups(
-        candidates,
+        eligible_candidates,
         market_data,
         max_setups=MAX_SETUPS,
         existing=open_signals,
@@ -172,8 +243,6 @@ def main() -> None:
         require_htf=REQUIRE_HTF_TREND,
         max_per_ccy=MAX_CURRENCY_EXPOSURE,
     )
-
-    slot = _signal_slot()
     candidates.sort(key=lambda item: item["score"], reverse=True)
 
     print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
@@ -241,7 +310,6 @@ def main() -> None:
                 "selection_filter": "adx+4h_trend+currency_exposure",
             }
         )
-        record_signal(market, setup, news)
         selected.append((market, setup))
 
     bulletin = format_bulletin(
@@ -250,7 +318,12 @@ def main() -> None:
     )
     print(bulletin)
     delivered = send_telegram(bulletin)
-    if not delivered:
+    if delivered:
+        # Journal only published signals; failed Telegram delivery must not
+        # poison the 12-hour duplicate guard or appear as an issued setup.
+        for market, setup in selected:
+            record_signal(market, setup, news)
+    else:
         logging.error("MercuryEdge generated a bulletin but Telegram delivery failed.")
 
 

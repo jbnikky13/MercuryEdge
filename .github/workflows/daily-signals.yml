@@ -3,11 +3,13 @@ name: MercuryEdge Daily Trade Signals
 on:
   schedule:
     # Run directly in Nigeria time so the schedule is self-documenting.
-    - cron: "30 9 * * 1-5"
+    - cron: "30 1 * * 1-5"
       timezone: "Africa/Lagos"
-    - cron: "30 14 * * 1-5"
+    - cron: "30 6 * * 1-5"
       timezone: "Africa/Lagos"
-    - cron: "30 19 * * 1-5"
+    - cron: "30 16 * * 1-5"
+      timezone: "Africa/Lagos"
+    - cron: "30 20 * * 1-5"
       timezone: "Africa/Lagos"
   workflow_dispatch:
 
@@ -42,8 +44,18 @@ jobs:
           MERCURY_PERIOD: 6mo
           MERCURY_INTERVAL: 1h
           MERCURY_MAX_SETUPS: 4
+          MERCURY_CRON: ${{ github.event.schedule }}
         run: |
-          echo "Scheduled MercuryEdge signal run"
+          # GitHub exposes the cron expression for scheduled runs. Map it to
+          # the intended batch explicitly, so queue delays don't change the
+          # batch's market universe. Manual runs intentionally use time fallback.
+          case "$MERCURY_CRON" in
+            "30 1 * * 1-5")  export MERCURY_SIGNAL_SLOT=overnight ;;
+            "30 6 * * 1-5")  export MERCURY_SIGNAL_SLOT=morning ;;
+            "30 16 * * 1-5") export MERCURY_SIGNAL_SLOT=afternoon ;;
+            "30 20 * * 1-5") export MERCURY_SIGNAL_SLOT=evening ;;
+          esac
+          echo "Scheduled MercuryEdge signal run (cron: ${MERCURY_CRON:-manual})"
           date
           python -m mercuryedge
 
