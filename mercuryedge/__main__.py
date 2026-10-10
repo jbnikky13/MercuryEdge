@@ -184,32 +184,25 @@ def main() -> None:
     # Restrict before ranking and MAX_SETUPS so off-session markets cannot
     # consume the slots and then be discarded afterward.
     batch_candidates = _restrict_to_batch(candidates, slot)
-    open_signals = _open_signals(SIGNAL_HORIZON_HOURS)
-    selected_candidates, skipped = select_setups(
-        batch_candidates,
-        market_data,
-        max_setups=MAX_SETUPS,
-        existing=open_signals,
-        min_adx=MIN_ADX,
-        require_htf=REQUIRE_HTF_TREND,
-        max_per_ccy=MAX_CURRENCY_EXPOSURE,
-    )
 
-    # Avoid re-sending symbols from the recent journal within the scheduler's 12h window.
+    # Apply the audit gate to the complete in-session candidate pool before
+    # regime/exposure ranking and MAX_SETUPS. Otherwise a weak candidate could
+    # occupy a slot and then be rejected, hiding a stronger eligible setup.
     now_utc = datetime.now(timezone.utc)
     recent_symbols = {}
     for row in read_journal():
         try:
             sent_at = pd.Timestamp(row.get("signal_time"))
             sent_at = sent_at.tz_localize("UTC") if sent_at.tzinfo is None else sent_at.tz_convert("UTC")
-            if now_utc - sent_at.to_pydatetime() < timedelta(hours=12):
+            age = now_utc - sent_at.to_pydatetime()
+            if timedelta(0) <= age < timedelta(hours=12):
                 recent_symbols[row.get("market") or row.get("symbol")] = 1
         except (TypeError, ValueError):
             continue
-    # Audit quality gate: block weak, paused, repeated, or feed-mismatched setups.
+
     filter_candidates = []
     candidate_by_key = {}
-    for item in selected_candidates:
+    for item in batch_candidates:
         setup = item["_setup"]
         rate = setup.get("historical_win_rate_3d")
         filter_sig = {
@@ -223,10 +216,28 @@ def main() -> None:
         }
         filter_candidates.append(filter_sig)
         candidate_by_key[(item["symbol"], item["direction"])] = item
-    kept, dropped = filter_batch(filter_candidates, price_lookup=get_live_price, already_sent_today=recent_symbols)
-    selected_candidates = [candidate_by_key[(sig["symbol"], sig["direction"])] for sig in kept]
+
+    kept, dropped = filter_batch(
+        filter_candidates,
+        price_lookup=get_live_price,
+        already_sent_today=recent_symbols,
+    )
+    eligible_candidates = [
+        candidate_by_key[(sig["symbol"], sig["direction"])] for sig in kept
+    ]
     for sig, why in dropped:
         logging.info("AUDIT FILTER DROPPED %s %s: %s", sig.get("symbol"), sig.get("direction"), why)
+
+    open_signals = _open_signals(SIGNAL_HORIZON_HOURS)
+    selected_candidates, skipped = select_setups(
+        eligible_candidates,
+        market_data,
+        max_setups=MAX_SETUPS,
+        existing=open_signals,
+        min_adx=MIN_ADX,
+        require_htf=REQUIRE_HTF_TREND,
+        max_per_ccy=MAX_CURRENCY_EXPOSURE,
+    )
     candidates.sort(key=lambda item: item["score"], reverse=True)
 
     print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
