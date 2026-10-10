@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -30,7 +31,11 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 
 def _signal_slot(now_utc: datetime | None = None) -> str:
-    """Return the signal window using Nigeria WAT, not runner/UTC time."""
+    """Use the triggering cron's explicit batch; fall back to Nigeria local time."""
+    requested = os.getenv("MERCURY_SIGNAL_SLOT", "").strip().lower()
+    valid_slots = {name.lower() for name, _time, _symbols in BATCHES}
+    if requested in valid_slots:
+        return requested
     now = (now_utc or datetime.now(timezone.utc)).astimezone(WAT)
     minutes = now.hour * 60 + now.minute
     for name, (hour, minute), _symbols in BATCHES:
