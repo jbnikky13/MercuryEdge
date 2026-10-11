@@ -15,7 +15,9 @@ SYMBOLS = {
     "NZDUSD": "NZDUSD=X", "USDCAD": "CAD=X", "USDCHF": "CHF=X",
     "USDJPY": "JPY=X", "CADJPY": "CADJPY=X",
     "SPX": "^GSPC", "DJI": "^DJI", "VIX": "^VIX", "DXY": "DX-Y.NYB",
-    "RUSSELL2000": "^RUT", "NASDAQ": "^NDX",
+    # MercuryEdge's production config uses ^IXIC (Nasdaq Composite) for NASDAQ.
+    # Keep NAS100 as the separate Nasdaq-100 instrument (^NDX).
+    "RUSSELL2000": "^RUT", "NASDAQ": "^IXIC",
     "US30": "^DJI", "NAS100": "^NDX", "SPX500": "^GSPC",
     "XAUUSD": "GC=F", "XAGUSD": "SI=F", "NATGAS": "NG=F",
     "UKOIL": "BZ=F", "USOIL": "CL=F", "COPPER": "HG=F",
