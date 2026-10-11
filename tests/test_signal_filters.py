@@ -57,7 +57,7 @@ def test_filter_keeps_highest_scoring_symbol_once():
 
 
 def test_shared_feed_uses_the_strategy_tickers():
-    assert resolve_ticker("NASDAQ") == "^NDX"
+    assert resolve_ticker("NASDAQ") == "^IXIC"
     assert resolve_ticker("^NDX") == "^NDX"
     assert resolve_ticker("USDCAD") == "CAD=X"
     assert resolve_ticker("USDCHF") == "CHF=X"
