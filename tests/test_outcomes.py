@@ -1,4 +1,8 @@
+import json
+
 import pandas as pd
+
+from mercuryedge.outcomes import _save
 
 from mercuryedge.outcomes import evaluate_signal
 from mercuryedge.walkforward import calibrate
@@ -53,3 +57,13 @@ def test_calibration_is_bounded():
     report = calibrate(rows, min_samples=20)
     modifier = report["factors"]["historical"]["POSITIVE"]["modifier"]
     assert -6 <= modifier <= 6
+
+
+def test_save_converts_numpy_boolean_to_json(tmp_path):
+    path = tmp_path / "outcomes.jsonl"
+    value = pd.Series([True], dtype="bool").iloc[0]
+
+    _save(path, [{"tp1_reached": value}])
+
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["tp1_reached"] is True
