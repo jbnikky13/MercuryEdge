@@ -1,0 +1,36 @@
+name: Historical Market Research
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * 1"
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: mercuryedge-historical-research
+  cancel-in-progress: false
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Fetch market history and replay current rules
+        env:
+          RESEARCH_HOURLY_PERIOD: "2y"
+          RESEARCH_DAILY_PERIOD: "10y"
+        run: python scripts/research_historical.py
+      - name: Upload historical research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mercuryedge-historical-research-${{ github.run_number }}
+          path: research_data/
+          if-no-files-found: warn
+          retention-days: 90
