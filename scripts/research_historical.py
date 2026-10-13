@@ -120,15 +120,18 @@ def _settle_one(signal: pd.Series, future: pd.DataFrame) -> dict:
             if original_stop_hit:
                 half_be_r = -1.0
                 break
+            if one_hit and be_hit:
+                # TP1 and breakeven are both touched in this hourly candle.
+                # Assume TP1 first, then the remaining half exits at entry.
+                half_be_r = 0.5 * tp1_r
+                break
             if two_hit:
+                # A TP2 candle necessarily crosses TP1. If it also revisits
+                # entry, the conservative BE-first tie-break above applies.
                 half_be_r = 0.5 * tp1_r + 0.5 * tp2_r
                 break
             if one_hit:
                 half_tp1_hit = True
-                # Conservative same-bar rule for an ambiguous TP1/BE revisit.
-                if be_hit:
-                    half_be_r = 0.5 * tp1_r
-                    break
         else:
             if be_hit:
                 half_be_r = 0.5 * tp1_r
