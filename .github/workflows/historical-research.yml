@@ -9,6 +9,8 @@ permissions:
 concurrency:
   group: mercuryedge-historical-research
   cancel-in-progress: false
+env:
+  PYTHONPATH: .
 jobs:
   research:
     runs-on: ubuntu-latest
