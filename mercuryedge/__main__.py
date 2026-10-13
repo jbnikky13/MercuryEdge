@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 from .analysis import adaptive_modifiers, add_indicators, analyze
-from .calendar import WAT, trading_status
+from .calendar import ET, WAT, trading_status
 from .config import (
     MARKETS,
     MAX_CURRENCY_EXPOSURE,
@@ -46,16 +46,24 @@ def _signal_slot(now_utc: datetime | None = None) -> str:
     return max(due)[1] if due else "overnight"
 
 
-def _restrict_to_batch(candidates: list[dict], slot: str) -> list[dict]:
-    """Restrict the candidate pool before ranking/capping, so other sessions
-    cannot crowd valid setups out of the active batch.
+def _restrict_to_batch(
+    candidates: list[dict], slot: str, *, include_indices: bool = True
+) -> list[dict]:
+    """Restrict candidates to this batch's universe and current market session.
+
+    A delayed GitHub Actions run must not publish stale index setups after the
+    US cash-session cutoff, but FX and commodity markets can remain tradable.
     """
     batch_name = slot.upper()
     symbols = next(
         (symbols for name, _time, symbols in BATCHES if name == batch_name),
         set(),
     )
-    return [item for item in candidates if item.get("symbol") in symbols]
+    return [
+        item for item in candidates
+        if item.get("symbol") in symbols
+        and (include_indices or item.get("_market").category != "index")
+    ]
 
 
 def _open_signals(horizon_hours: int = 24) -> list[dict]:
@@ -87,9 +95,21 @@ def main() -> None:
     else:
         allowed, reason = trading_status()
         if not allowed:
-            logging.info("MercuryEdge scan skipped: %s", reason)
-            return
+            if reason == "past 16:00 ET scan cutoff" and slot in {"afternoon", "evening"}:
+                # GitHub Actions can start scheduled jobs hours late. Preserve
+                # useful FX/commodity coverage, but never issue stale US-index
+                # setups outside the cash-session window.
+                logging.warning(
+                    "MercuryEdge %s scan started after the US index cutoff; "
+                    "continuing with FX/commodities only (ET now %s).",
+                    slot,
+                    datetime.now(ET).strftime("%H:%M %Z"),
+                )
+            else:
+                logging.info("MercuryEdge scan skipped: %s", reason)
+                return
 
+    late_us_scan = slot in {"afternoon", "evening"} and datetime.now(ET).hour >= 16
     news = nfp_risk()
     if news.high_impact:
         logging.info("News risk detected: %s", news.reason)
@@ -188,7 +208,14 @@ def main() -> None:
 
     # Restrict before ranking and MAX_SETUPS so off-session markets cannot
     # consume the slots and then be discarded afterward.
-    batch_candidates = _restrict_to_batch(candidates, slot)
+    batch_candidates = _restrict_to_batch(
+        candidates, slot, include_indices=not late_us_scan
+    )
+    if late_us_scan:
+        logging.warning(
+            "Late %s batch: excluded US index candidates; evaluating FX/commodities only.",
+            slot,
+        )
 
     # Apply the audit gate to the complete in-session candidate pool before
     # regime/exposure ranking and MAX_SETUPS. Otherwise a weak candidate could
