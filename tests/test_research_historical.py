@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 
 from scripts.research_historical import _settle_one, replay
@@ -40,7 +42,7 @@ def test_half_be_policy_moves_remaining_stop_to_entry_after_tp1():
         {"High": 101.4, "Low": 99.9, "Close": 100.2},
     ])
     result = _settle_one(signal, future)
-    assert result["half_be_R"] == 0.575
+    assert math.isclose(result["half_be_R"], 0.575, abs_tol=1e-9)
     assert result["tp1_hit"] is True
 
 
@@ -54,4 +56,4 @@ def test_half_be_policy_wins_when_tp2_is_reached_without_breakeven_revisit():
         {"High": 102.3, "Low": 101.2, "Close": 102.2},
     ])
     result = _settle_one(signal, future)
-    assert result["half_be_R"] == 1.7
+    assert math.isclose(result["half_be_R"], 1.7, abs_tol=1e-9)
