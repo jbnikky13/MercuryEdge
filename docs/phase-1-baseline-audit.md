@@ -78,3 +78,39 @@ Source: Signal Auditor `data/audit-results.csv` on its `main` branch, 55 rows. T
 ## Decision
 
 **Do not tune or change the live strategy based on this first-pass sample.** The apparent positive TP1-only exit result is small (+0.096R per signal before costs) and is not yet a fair comparison under the documented 24-hour horizon. The TP2-only simplified result is approximately flat/slightly negative. Correct the settlement horizon and reproduce the price paths before evaluating strategy quality or promoting filters.
+
+
+## Follow-up after Signal Auditor PR #2 — provisional 24-hour review (2026-10-13)
+
+Signal Auditor PR #2 is merged to `main`; its default settlement horizon is now 24 hours. The 55-row CSV was re-examined against the stored signal, TP1, and terminal timestamps. Eleven records have TP1 or a recorded terminal event beyond the 24-hour cutoff. A provisional timestamp-based review is committed in Signal Auditor at `data/24h-horizon-review-provisional.csv`, with methodology and limitations in `docs/24h-horizon-reconciliation.md`.
+
+**This is not candle-verified re-settlement.** The source repository excludes `data/candles/*.csv` from Git; the Yahoo 1-minute fetch is a rolling ~7-day window, and the earliest affected signals date from Sep 29–Oct 5. The PR test run had no candle artifact. Therefore, the original minute candles are still required before historical labels can be finalized.
+
+### Timestamp-based provisional classes
+
+| Class | Count |
+| --- | ---: |
+| TP2 | 13 |
+| SL | 21 |
+| TP1_THEN_SL | 5 |
+| TP1_ONLY | 5 |
+| NO_RESOLUTION | 9 |
+| DATA_MISMATCH | 2 |
+| Total | 55 |
+
+The timestamp-based result has 44 provisionally resolved, non-mismatch records. TP1 was recorded before expiry in 23/44 (52.3%). Simplified gross fixed-R scenarios give TP1-exit +5.508R total / +0.125R per resolved trade, and TP2-only +3.343R total / +0.086R per 39 eligible records. These are **provisional calculations**, not validated live returns: they rely on stored event timestamps and target/stop distances, and do not verify minute-level coverage, price path, spreads, slippage, commissions, or partial exit handling. Do not use them to tune live strategy behavior.
+
+### Reconciliation findings
+
+- **NASDAQ rows 123 and 129:** Auditor and MercuryEdge both map the label `NASDAQ` to Yahoo `^IXIC`, but the recorded feed quotes (~30,924 and ~31,019) are far from signal entries (~27,313 and ~27,439). The source likely used a different Nasdaq instrument/provider. Keep both excluded; do not silently change the production mapping until the original signal source/ticker is identified.
+- **CADJPY record 1223:** Signal Auditor records a SELL at 06:56:33 UTC (entry 110.86, SL 110.99) with a stop timestamp at 08:45 UTC. MercuryEdge journal has a near-identical SELL in its 06:00 UTC batch (entry 110.863998, SL 110.989818), but the timestamps differ by 56m33s and the journal snapshot remained OPEN. Treat as likely related, not confirmed identical, until publication time and archived candles are checked.
+- The original `data/audit-results.csv` was deliberately left unchanged. The provisional classifications are in a separate file to prevent an unverified timestamp inference from silently rewriting canonical history.
+
+### Remaining Phase 1 gates
+
+- [ ] Obtain archived minute OHLC data for all 11 horizon-affected records and CADJPY, with provider/ticker and timezone provenance.
+- [ ] Re-settle with the merged 24-hour engine, checking candle gaps, signal-candle exclusion, spread, same-candle ambiguity, and exact cutoff.
+- [ ] Identify the actual Nasdaq instrument/source for rows 123 and 129; keep them excluded until then.
+- [ ] Reconcile CADJPY source publication time, price path, and journal status.
+- [ ] Recalculate final baseline after candle-level resettlement, then run chronological walk-forward comparisons. `data/walkforward.json` still has zero folds and `data/calibration.json` still has zero samples.
+- [ ] Keep live scoring, filters, Telegram behavior, and adaptive modifier unchanged until out-of-sample results justify a change.
