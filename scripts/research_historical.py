@@ -66,35 +66,87 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _settle_one(signal: pd.Series, future: pd.DataFrame) -> dict:
+    """Settle baseline exits and a true half-at-TP1 / half-at-breakeven policy.
+
+    Hourly OHLC cannot reveal intrabar ordering. For the half/BE policy, if
+    entry and TP2 are both touched after TP1 in one bar, assume breakeven first.
+    """
     side = 1 if signal["direction"] == "BUY" else -1
     entry, risk = float(signal["entry"]), float(signal["risk"])
     stop, tp1, tp2 = float(signal["sl"]), float(signal["tp1"]), float(signal["tp2"])
-    tp1_hit = False
     tp1_r = side * (tp1 - entry) / risk
     tp2_r = side * (tp2 - entry) / risk
+
+    # Baseline full-position outcomes.
+    tp1_hit = False
+    outcome = "EXPIRED"
+    last = float(future["Close"].iloc[-1]) if not future.empty else entry
+    mark_r = side * (last - entry) / risk
+    tp1_full_r = mark_r
+    tp2_full_r = mark_r
     for _, candle in future.iterrows():
         high, low = float(candle["High"]), float(candle["Low"])
         stop_hit = low <= stop if side == 1 else high >= stop
         one_hit = high >= tp1 if side == 1 else low <= tp1
         two_hit = high >= tp2 if side == 1 else low <= tp2
-        # Conservative tie-break: if stop and target occur in the same bar,
-        # count stop first because hourly OHLC cannot reveal intrabar order.
+        # Conservative stop-first tie-break for ambiguous hourly candles.
         if stop_hit:
-            return {"outcome": "TP1_THEN_SL" if tp1_hit else "SL", "tp1_hit": tp1_hit,
-                    "tp1_full_R": tp1_r if tp1_hit else -1.0,
-                    "tp2_full_R": -1.0,
-                    "half_be_R": (0.5 * tp1_r if tp1_hit else -1.0)}
+            outcome = "TP1_THEN_SL" if tp1_hit else "SL"
+            tp1_full_r = tp1_r if tp1_hit else -1.0
+            tp2_full_r = -1.0
+            break
         if two_hit:
-            return {"outcome": "TP2", "tp1_hit": True, "tp1_full_R": tp1_r,
-                    "tp2_full_R": tp2_r, "half_be_R": 0.5 * tp1_r + 0.5 * tp2_r}
+            tp1_hit = True
+            outcome = "TP2"
+            tp1_full_r = tp1_r
+            tp2_full_r = tp2_r
+            break
         if one_hit:
             tp1_hit = True
-    last = float(future["Close"].iloc[-1]) if not future.empty else entry
-    mark_r = side * (last - entry) / risk
-    return {"outcome": "EXPIRED", "tp1_hit": tp1_hit,
-            "tp1_full_R": tp1_r if tp1_hit else mark_r,
-            "tp2_full_R": mark_r,
-            "half_be_R": 0.5 * tp1_r + 0.5 * mark_r if tp1_hit else mark_r}
+            tp1_full_r = tp1_r
+
+    # Independent simulation of half taken at TP1 and remaining half protected
+    # by a stop at entry after TP1. This does not reuse the baseline SL state.
+    half_tp1_hit = False
+    half_be_r = None
+    for _, candle in future.iterrows():
+        high, low = float(candle["High"]), float(candle["Low"])
+        original_stop_hit = low <= stop if side == 1 else high >= stop
+        one_hit = high >= tp1 if side == 1 else low <= tp1
+        two_hit = high >= tp2 if side == 1 else low <= tp2
+        be_hit = low <= entry if side == 1 else high >= entry
+
+        if not half_tp1_hit:
+            if original_stop_hit:
+                half_be_r = -1.0
+                break
+            if two_hit:
+                half_be_r = 0.5 * tp1_r + 0.5 * tp2_r
+                break
+            if one_hit:
+                half_tp1_hit = True
+                # Conservative same-bar rule for an ambiguous TP1/BE revisit.
+                if be_hit:
+                    half_be_r = 0.5 * tp1_r
+                    break
+        else:
+            if be_hit:
+                half_be_r = 0.5 * tp1_r
+                break
+            if two_hit:
+                half_be_r = 0.5 * tp1_r + 0.5 * tp2_r
+                break
+
+    if half_be_r is None:
+        half_be_r = 0.5 * tp1_r + 0.5 * mark_r if half_tp1_hit else mark_r
+
+    return {
+        "outcome": outcome,
+        "tp1_hit": tp1_hit,
+        "tp1_full_R": tp1_full_r,
+        "tp2_full_R": tp2_full_r,
+        "half_be_R": half_be_r,
+    }
 
 
 def replay(frame: pd.DataFrame, symbol: str) -> pd.DataFrame:

@@ -14,7 +14,7 @@ This job downloads historical OHLC data for every market in `mercuryedge.config.
 - The signal uses only indicators calculated from bars at or before its timestamp.
 - Settlement inspects the next 24 hourly bars.
 - If stop and target are both inside the same hourly bar, the replay conservatively counts the stop first because OHLC cannot reveal intrabar ordering.
-- Results include three illustrative exit policies: TP1 full exit, TP2 full exit, and half at TP1 / half at TP2 (with a break-even stop after TP1).
+- Results include three illustrative exit policies: TP1 full exit, TP2 full exit, and half at TP1 with the remaining half stopped at entry after TP1. The half/breakeven simulation uses a conservative assumption when entry and TP2 are both touched in the same hourly candle.
 - Results are gross R-multiples. Spread, slippage, financing, broker-specific contract sizing and latency are **not** included.
 - Expired trades are marked to the final close after 24 bars. This is not a substitute for broker fills.
 
