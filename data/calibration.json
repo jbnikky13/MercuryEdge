@@ -1,5 +1,41 @@
 {
-  "version": 2,
-  "samples": 0,
-  "factors": {}
+  "baseline_win_rate": 0.3379,
+  "factors": {
+    "agreement": {
+      "LOW": {
+        "baseline_win_rate": 0.3379,
+        "edge": -0.027,
+        "modifier": 0,
+        "samples": 119,
+        "win_rate": 0.3109
+      }
+    },
+    "crossmarket": {
+      "NEUTRAL": {
+        "baseline_win_rate": 0.3379,
+        "edge": -0.0239,
+        "modifier": 0,
+        "samples": 121,
+        "win_rate": 0.314
+      }
+    },
+    "historical": {
+      "NEUTRAL": {
+        "baseline_win_rate": 0.3379,
+        "edge": -0.0358,
+        "modifier": 0,
+        "samples": 96,
+        "win_rate": 0.3021
+      },
+      "POSITIVE": {
+        "baseline_win_rate": 0.3379,
+        "edge": 0.0787,
+        "modifier": 1,
+        "samples": 48,
+        "win_rate": 0.4167
+      }
+    }
+  },
+  "samples": 145,
+  "version": 2
 }

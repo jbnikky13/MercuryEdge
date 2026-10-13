@@ -1,7 +1,60 @@
 {
-  "fold_count": 0,
-  "folds": [],
-  "mean_selected_test_win_rate": null,
+  "fold_count": 4,
+  "folds": [
+    {
+      "average_modifier": 0.0,
+      "selected_test_samples": 20,
+      "selected_test_win_rate": 0.4,
+      "test_baseline_win_rate": 0.4,
+      "test_end": "2026-09-25 13:30:00+00:00",
+      "test_samples": 20,
+      "test_start": "2026-09-22 17:00:00+00:00",
+      "train_baseline_win_rate": 0.3333,
+      "train_end": "2026-09-22 17:00:00+00:00",
+      "train_samples": 60,
+      "train_start": "2026-09-14 15:00:00+00:00"
+    },
+    {
+      "average_modifier": 1.8,
+      "selected_test_samples": 18,
+      "selected_test_win_rate": 0.5,
+      "test_baseline_win_rate": 0.45,
+      "test_end": "2026-09-30 18:00:00+00:00",
+      "test_samples": 20,
+      "test_start": "2026-09-25 13:30:00+00:00",
+      "train_baseline_win_rate": 0.4333,
+      "train_end": "2026-09-25 13:30:00+00:00",
+      "train_samples": 60,
+      "train_start": "2026-09-16 13:00:00+00:00"
+    },
+    {
+      "average_modifier": 0.0,
+      "selected_test_samples": 20,
+      "selected_test_win_rate": 0.35,
+      "test_baseline_win_rate": 0.35,
+      "test_end": "2026-10-05 16:30:00+00:00",
+      "test_samples": 20,
+      "test_start": "2026-09-30 18:00:00+00:00",
+      "train_baseline_win_rate": 0.4167,
+      "train_end": "2026-09-30 18:00:00+00:00",
+      "train_samples": 60,
+      "train_start": "2026-09-18 17:00:00+00:00"
+    },
+    {
+      "average_modifier": -0.15,
+      "selected_test_samples": 18,
+      "selected_test_win_rate": 0.2222,
+      "test_baseline_win_rate": 0.2,
+      "test_end": "2026-10-08 19:00:00+00:00",
+      "test_samples": 20,
+      "test_start": "2026-10-05 17:00:00+00:00",
+      "train_baseline_win_rate": 0.4,
+      "train_end": "2026-10-05 16:30:00+00:00",
+      "train_samples": 60,
+      "train_start": "2026-09-22 17:00:00+00:00"
+    }
+  ],
+  "mean_selected_test_win_rate": 0.368,
   "method": "rolling_train_then_unseen_test",
   "test_size": 20,
   "train_size": 60,
