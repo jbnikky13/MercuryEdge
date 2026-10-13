@@ -57,3 +57,15 @@ def test_half_be_policy_wins_when_tp2_is_reached_without_breakeven_revisit():
     ])
     result = _settle_one(signal, future)
     assert math.isclose(result["half_be_R"], 1.7, abs_tol=1e-9)
+
+
+def test_half_be_policy_assumes_breakeven_before_tp2_when_same_hour_touches_both():
+    signal = pd.Series({
+        "direction": "BUY", "entry": 100.0, "risk": 1.0,
+        "sl": 99.0, "tp1": 101.15, "tp2": 102.25,
+    })
+    future = pd.DataFrame([
+        {"High": 102.4, "Low": 99.9, "Close": 101.0},
+    ])
+    result = _settle_one(signal, future)
+    assert math.isclose(result["half_be_R"], 0.575, abs_tol=1e-9)
