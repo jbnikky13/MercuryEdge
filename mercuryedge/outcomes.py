@@ -20,11 +20,25 @@ def _load(path: Path) -> list[dict]:
     return rows
 
 
+def _json_default(value):
+    """Convert NumPy/Pandas scalar values into standard JSON-compatible types."""
+    # NumPy booleans/integers/floats expose item(); their type names can overlap
+    # built-in names (e.g. numpy.bool_ reports as ``bool`` in some contexts).
+    item = getattr(value, "item", None)
+    if callable(item):
+        return item()
+    if isinstance(value, (pd.Timestamp,)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _save(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+            handle.write(
+                json.dumps(row, separators=(",", ":"), default=_json_default) + "\n"
+            )
 
 
 def evaluate_signal(signal: dict, candles: pd.DataFrame, horizon: int = 24) -> dict:
