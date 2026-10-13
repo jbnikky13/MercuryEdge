@@ -29,8 +29,10 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
     d = add_indicators(frame)
     prev = d.shift(1)
-    bullish = (d["EMA20"] > d["EMA50"]) & (d["EMA50"] > d["EMA200"]) & (d["Close"] > d["EMA20"])
-    bearish = (d["EMA20"] < d["EMA50"]) & (d["EMA50"] < d["EMA200"]) & (d["Close"] < d["EMA20"])
+    strong_bull = (d["EMA20"] > d["EMA50"]) & (d["EMA50"] > d["EMA200"]) & (d["Close"] > d["EMA20"])
+    strong_bear = (d["EMA20"] < d["EMA50"]) & (d["EMA50"] < d["EMA200"]) & (d["Close"] < d["EMA20"])
+    bullish = strong_bull | (d["Close"] > d["EMA50"])
+    bearish = strong_bear | (d["Close"] < d["EMA50"])
     buy = bullish & d["RSI"].between(50, 72) & (d["MACD"] > d["MACD_SIGNAL"])
     sell = bearish & d["RSI"].between(28, 50) & (d["MACD"] < d["MACD_SIGNAL"])
     breakout = buy & (d["Close"] > d["ROLL_HIGH"]) & (prev["Close"] <= prev["ROLL_HIGH"])
@@ -42,10 +44,17 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
     out["direction"] = direction.loc[out.index]
     out["setup"] = np.where(breakout.loc[out.index], "BREAKOUT",
                     np.where(breakdown.loc[out.index], "BREAKDOWN", "TREND_CONTINUATION"))
-    out["score"] = np.where(
-        out["direction"].eq("BUY"),
-        np.where(bullish.loc[out.index], 55, 0) + np.where(out["RSI"] > 55, 8, 0) + np.where(breakout.loc[out.index], 18, 0),
-        np.where(bearish.loc[out.index], 55, 0) + np.where(out["RSI"] < 45, 8, 0) + np.where(breakdown.loc[out.index], 18, 0),
+    base_score = np.where(
+        strong_bull.loc[out.index] | strong_bear.loc[out.index], 30,
+        np.where((d["Close"].loc[out.index] > d["EMA50"].loc[out.index]) |
+                 (d["Close"].loc[out.index] < d["EMA50"].loc[out.index]), 18, 0)
+    )
+    is_buy = out["direction"].eq("BUY")
+    out["score"] = (
+        base_score + 25
+        + np.where(is_buy & (out["RSI"] > 55), 8, 0)
+        + np.where((~is_buy) & (out["RSI"] < 45), 8, 0)
+        + np.where(breakout.loc[out.index] | breakdown.loc[out.index], 18, 0)
     )
     out["entry"] = out["Close"]
     out["risk"] = out["ATR"] * 1.25
