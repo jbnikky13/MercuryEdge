@@ -105,6 +105,14 @@ MercuryEdge now uses a strict **24-hour outcome horizon** so live outcome tracki
 
 The current Signal Auditor sample is treated as calibration evidence, not as a permanent filter: no score band or cross-market rule is promoted from a small sample until it has sufficient observations and passes walk-forward validation. This prevents the system from overfitting to a handful of historical signals.
 
+## Walk-forward strategy validation
+
+The historical research workflow now runs a research-only chronological selector experiment after replaying the current rules. It uses a rolling 365-day training window followed by a 90-day unseen test window, advances by 90 days, purges training signals whose 24-hour outcome horizon reaches the test boundary, and suppresses overlapping same-symbol trades. A symbol/direction group is eligible only when it has at least 30 training trades and its training average exceeds the configured assumed costs plus a minimum edge buffer.
+
+The workflow compares the existing baseline with the training-selected subset at assumed round-trip costs of 0R, 0.05R, and 0.10R. Results are saved to `research_data/walk-forward-folds.csv`, `research_data/walk-forward-summary.csv`, and `research_data/walk-forward-report.json`.
+
+This experiment **does not change live signal generation or enable a filter**. Yahoo Finance history is a research proxy, cost levels are scenarios rather than broker quotes, and any apparent improvement must be independently reviewed and paper-tested before a production rule is considered.
+
 ## Journal
 
 Published signals are written to:
