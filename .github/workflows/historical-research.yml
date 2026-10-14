@@ -28,6 +28,8 @@ jobs:
           RESEARCH_HOURLY_PERIOD: "2y"
           RESEARCH_DAILY_PERIOD: "10y"
         run: python scripts/research_historical.py
+      - name: Analyze non-overlapping trades and cost sensitivity
+        run: python scripts/analyze_independent_research.py
       - name: Upload historical research artifact
         if: always()
         uses: actions/upload-artifact@v4
