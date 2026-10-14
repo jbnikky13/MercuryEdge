@@ -95,14 +95,16 @@ def build_context(
         raise ValueError("direction must be BUY or SELL")
 
     # Use the latest feature state available at or before the query timestamp.
-    prior_features = data[data.index < ts]
+    query_day = ts.normalize()
+    # Daily bars are only treated as known after their calendar day has ended.
+    prior_features = data[data.index.normalize() < query_day]
     if prior_features.empty:
         return _empty_context(ts, "No prior observations")
     latest = prior_features.iloc[-1]
 
     # Outcomes need three complete daily bars to mature. The cutoff also
     # prevents historical forward labels from crossing into the query time.
-    eligible = data[data.index + pd.Timedelta(days=3) <= ts].dropna(
+    eligible = data[data.index.normalize() + pd.Timedelta(days=3) < query_day].dropna(
         subset=["forward_1d", "forward_3d", "forward_5d", "vol_20", "vol_median"]
     )
     if eligible.empty:
