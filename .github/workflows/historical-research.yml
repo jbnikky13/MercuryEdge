@@ -32,6 +32,17 @@ jobs:
         run: python scripts/discover_recurring_patterns.py
       - name: Analyze non-overlapping trades and cost sensitivity
         run: python scripts/analyze_independent_research.py
+      - name: Validate selector with chronological walk-forward tests
+        env:
+          WALK_FORWARD_TRAIN_DAYS: "365"
+          WALK_FORWARD_TEST_DAYS: "90"
+          WALK_FORWARD_STEP_DAYS: "90"
+          WALK_FORWARD_HORIZON_HOURS: "24"
+          WALK_FORWARD_MIN_TRAIN_TRADES: "30"
+          WALK_FORWARD_SELECTION_COST_R: "0.05"
+          WALK_FORWARD_MIN_TRAIN_EDGE_R: "0.02"
+          WALK_FORWARD_COSTS_R: "0,0.05,0.10"
+        run: python scripts/walk_forward_validation.py
       - name: Upload historical research artifact
         if: always()
         uses: actions/upload-artifact@v4
