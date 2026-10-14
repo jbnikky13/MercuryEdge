@@ -18,6 +18,11 @@ This job downloads historical OHLC data for every market in `mercuryedge.config.
 - Results are gross R-multiples. Spread, slippage, financing, broker-specific contract sizing and latency are **not** included.
 - Expired trades are marked to the final close after 24 bars. This is not a substitute for broker fills.
 
+## Overlap and cost sensitivity
+- The workflow also creates an independent-trade sensitivity view by keeping the first signal per symbol and skipping later same-symbol signals for 24 hours. This reduces the most obvious overlap but does **not** remove correlated trades across different symbols.
+- It reports assumed round-trip costs of 0.00R, 0.05R, 0.10R and 0.20R per trade. These are stress-test scenarios, not measured broker costs or claims about any specific broker.
+- Outputs include `independent-trades.csv`, `independent-summary.csv`, `independent-by-symbol.csv`, `independent-by-period.csv`, and `independent-report.json`.
+
 ## What would qualify as an improvement
 Do not change production thresholds based on in-sample returns. Add a candidate filter only after it beats the current baseline on chronological out-of-sample windows, has enough independent trades, survives conservative cost assumptions, and does not merely improve one instrument or one market regime. Report trade count, expectancy, profit factor, drawdown, confidence intervals, and costs. Preserve an untouched final holdout period.
 
@@ -25,4 +30,5 @@ Do not change production thresholds based on in-sample returns. Add a candidate 
 ```bash
 pip install -r requirements.txt
 python scripts/research_historical.py
+python scripts/analyze_independent_research.py
 ```
