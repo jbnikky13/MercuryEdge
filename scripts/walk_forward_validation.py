@@ -11,8 +11,9 @@ import json
 import os
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
+
+from scripts.analyze_independent_research import select_non_overlapping
 
 ROOT = Path(os.getenv("RESEARCH_OUTPUT", "research_data"))
 POLICY = "tp1_full_R"
@@ -99,10 +100,16 @@ def walk_forward(
     """Return fold-level results, combined out-of-sample results and metadata."""
     if train_days <= 0 or test_days <= 0 or step_days <= 0 or horizon_hours < 0:
         raise ValueError("Window lengths must be positive and horizon cannot be negative")
+    raw_input_count = int(len(trades))
     data = _prepare_trades(trades)
+    valid_input_count = int(len(data))
+    # Keep the earliest signal and suppress same-symbol trades during the 24h outcome horizon.
+    # This avoids letting dozens of overlapping hourly signals dominate the selector experiment.
+    data = select_non_overlapping(data, cooldown_hours=horizon_hours)
     if data.empty:
         return pd.DataFrame(), pd.DataFrame(), {
-            "status": "insufficient_data", "input_trades": 0, "folds": 0,
+            "status": "insufficient_data", "input_trades": raw_input_count,
+            "valid_input_trades": valid_input_count, "non_overlapping_trades": 0, "folds": 0,
             "reason": "No valid replay trades were available.",
         }
 
@@ -189,7 +196,9 @@ def walk_forward(
 
     report = {
         "status": "completed" if fold_number else "insufficient_data",
-        "input_trades": int(len(data)),
+        "input_trades": raw_input_count,
+        "valid_input_trades": valid_input_count,
+        "non_overlapping_trades": int(len(data)),
         "first_signal_utc": earliest.isoformat(),
         "last_signal_utc": latest.isoformat(),
         "folds": int(fold_number),
