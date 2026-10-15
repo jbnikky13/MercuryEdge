@@ -40,8 +40,15 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
     direction = pd.Series("", index=d.index, dtype="object")
     direction.loc[buy] = "BUY"
     direction.loc[sell] = "SELL"
-    out = d.loc[buy | sell, ["Open", "High", "Low", "Close", "ATR", "RSI"]].copy()
+    out = d.loc[buy | sell, ["Open", "High", "Low", "Close", "ATR", "RSI", "EMA20", "EMA50", "EMA200"]].copy()
     out["direction"] = direction.loc[out.index]
+    uptrend = (out["EMA20"] > out["EMA50"]) & (out["EMA50"] > out["EMA200"])
+    downtrend = (out["EMA20"] < out["EMA50"]) & (out["EMA50"] < out["EMA200"])
+    out["market_regime"] = np.select([uptrend, downtrend], ["TRENDING_UP", "TRENDING_DOWN"], default="MIXED")
+    atr_pct = out["ATR"] / out["Close"].replace(0, np.nan) * 100
+    # Trailing median avoids using future bars to label volatility.
+    rolling_median = atr_pct.rolling(120, min_periods=30).median()
+    out["volatility_regime"] = np.where(atr_pct >= rolling_median, "HIGHER_VOL", "LOWER_VOL")
     out["setup"] = np.where(breakout.loc[out.index], "BREAKOUT",
                     np.where(breakdown.loc[out.index], "BREAKDOWN", "TREND_CONTINUATION"))
     base_score = np.where(
@@ -143,12 +150,40 @@ def _settle_one(signal: pd.Series, future: pd.DataFrame) -> dict:
     if half_be_r is None:
         half_be_r = 0.5 * tp1_r + 0.5 * mark_r if half_tp1_hit else mark_r
 
+    # Independent simulation: half exits at TP1; remaining half keeps original stop.
+    half_tp1_hit_sl = False
+    half_sl_r = None
+    for _, candle in future.iterrows():
+        high, low = float(candle["High"]), float(candle["Low"])
+        original_stop_hit = low <= stop if side == 1 else high >= stop
+        one_hit = high >= tp1 if side == 1 else low <= tp1
+        two_hit = high >= tp2 if side == 1 else low <= tp2
+        if not half_tp1_hit_sl:
+            if original_stop_hit:
+                half_sl_r = -1.0
+                break
+            if two_hit:
+                half_sl_r = 0.5 * tp1_r + 0.5 * tp2_r
+                break
+            if one_hit:
+                half_tp1_hit_sl = True
+        else:
+            if original_stop_hit:
+                half_sl_r = 0.5 * tp1_r - 0.5
+                break
+            if two_hit:
+                half_sl_r = 0.5 * tp1_r + 0.5 * tp2_r
+                break
+    if half_sl_r is None:
+        half_sl_r = 0.5 * tp1_r + 0.5 * mark_r if half_tp1_hit_sl else mark_r
+
     return {
         "outcome": outcome,
         "tp1_hit": tp1_hit,
         "tp1_full_R": tp1_full_r,
         "tp2_full_R": tp2_full_r,
         "half_be_R": half_be_r,
+        "half_sl_R": half_sl_r,
     }
 
 
@@ -169,6 +204,8 @@ def replay(frame: pd.DataFrame, symbol: str) -> pd.DataFrame:
         rows.append({
             "symbol": symbol, "ts": ts.isoformat(), "direction": signal["direction"],
             "setup": signal["setup"], "score": int(signal["score"]),
+            "market_regime": signal["market_regime"],
+            "volatility_regime": signal["volatility_regime"],
             "entry": float(signal["entry"]), "sl": float(signal["sl"]),
             "tp1": float(signal["tp1"]), "tp2": float(signal["tp2"]),
             **settled,
