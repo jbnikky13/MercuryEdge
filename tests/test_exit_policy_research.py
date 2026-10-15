@@ -12,8 +12,8 @@ def test_half_tp1_original_stop_policy_keeps_original_stop_after_tp1():
     candles[0] = {"High": 112.0, "Low": 101.0, "Close": 110.0}
     candles[1] = {"High": 108.0, "Low": 89.0, "Close": 95.0}
     result = _settle_one(signal, pd.DataFrame(candles))
-    assert result["half_sl_R"] == 0.075
-    assert result["half_be_R"] == 0.575
+    assert abs(result["half_sl_R"] - 0.075) < 1e-9
+    assert abs(result["half_be_R"] - 0.575) < 1e-9
 
 
 def test_exit_policy_results_are_all_reported():
