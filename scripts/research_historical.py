@@ -45,10 +45,16 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
     uptrend = (out["EMA20"] > out["EMA50"]) & (out["EMA50"] > out["EMA200"])
     downtrend = (out["EMA20"] < out["EMA50"]) & (out["EMA50"] < out["EMA200"])
     out["market_regime"] = np.select([uptrend, downtrend], ["TRENDING_UP", "TRENDING_DOWN"], default="MIXED")
-    atr_pct = out["ATR"] / out["Close"].replace(0, np.nan) * 100
-    # Trailing median avoids using future bars to label volatility.
-    rolling_median = atr_pct.rolling(120, min_periods=30).median()
-    out["volatility_regime"] = np.where(atr_pct >= rolling_median, "HIGHER_VOL", "LOWER_VOL")
+    # Compute volatility labels over all bars, not only signal bars, using trailing data.
+    atr_pct_all = d["ATR"] / d["Close"].replace(0, np.nan) * 100
+    rolling_median_all = atr_pct_all.rolling(120, min_periods=30).median()
+    atr_pct = atr_pct_all.loc[out.index]
+    rolling_median = rolling_median_all.loc[out.index]
+    out["volatility_regime"] = np.select(
+        [rolling_median.isna(), atr_pct >= rolling_median],
+        ["UNKNOWN", "HIGHER_VOL"],
+        default="LOWER_VOL",
+    )
     out["setup"] = np.where(breakout.loc[out.index], "BREAKOUT",
                     np.where(breakdown.loc[out.index], "BREAKDOWN", "TREND_CONTINUATION"))
     base_score = np.where(
