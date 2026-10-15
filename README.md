@@ -111,6 +111,8 @@ The historical research workflow now runs a research-only chronological selector
 
 The workflow compares the existing baseline with the training-selected subset at assumed round-trip costs of 0R, 0.05R, and 0.10R. Results are saved to `research_data/walk-forward-folds.csv`, `research_data/walk-forward-summary.csv`, and `research_data/walk-forward-report.json`.
 
+The historical replay also compares four exit policies: full position at TP1, full position at TP2, half at TP1 with the remainder at breakeven, and half at TP1 with the remainder retaining its original stop. It reports performance by symbol, direction, setup type, trend regime, volatility regime, and chronological period, including average R, win rate, profit factor, and drawdown where applicable. The trend regime uses EMA structure; the volatility regime uses a trailing ATR/price median to avoid looking ahead. These context slices are diagnostic and may be noisy when sample counts are small.
+
 This experiment **does not change live signal generation or enable a filter**. Yahoo Finance history is a research proxy, cost levels are scenarios rather than broker quotes, and any apparent improvement must be independently reviewed and paper-tested before a production rule is considered.
 
 ## Journal
