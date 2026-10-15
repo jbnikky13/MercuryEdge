@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(os.getenv("RESEARCH_OUTPUT", "research_data"))
-POLICIES = ["tp1_full_R", "tp2_full_R", "half_be_R"]
+POLICIES = ["tp1_full_R", "tp2_full_R", "half_be_R", "half_sl_R"]
 COSTS_R = [0.0, 0.05, 0.10, 0.20]
 COOLDOWN_HOURS = 24
 
@@ -73,6 +73,23 @@ def analyze(trades: pd.DataFrame):
                                   "assumed_round_trip_cost_R": cost, **_metrics(net)})
     symbol_summary = pd.DataFrame(by_symbol)
 
+    context_rows = []
+    # Diagnostic performance slices; not permission to enable a live filter.
+    for dimension in ("symbol", "direction", "setup", "market_regime", "volatility_regime"):
+        if dimension not in selected.columns:
+            continue
+        for value, group in selected.groupby(dimension, dropna=False):
+            for policy in POLICIES:
+                for cost in COSTS_R:
+                    net = pd.to_numeric(group[policy], errors="coerce") - cost
+                    context_rows.append({
+                        "context_dimension": dimension,
+                        "context_value": str(value),
+                        "policy": policy,
+                        "assumed_round_trip_cost_R": cost,
+                        **_metrics(net),
+                    })
+
     periods = []
     chronological = selected.sort_values("ts").reset_index(drop=True)
     if not chronological.empty:
@@ -90,7 +107,7 @@ def analyze(trades: pd.DataFrame):
                         "period_end_utc": group["ts"].max().isoformat(),
                         "policy": policy, "assumed_round_trip_cost_R": cost, **_metrics(net),
                     })
-    return selected, overall, symbol_summary, pd.DataFrame(periods)
+    return selected, overall, symbol_summary, pd.DataFrame(periods), pd.DataFrame(context_rows)
 
 
 def main() -> int:
@@ -98,11 +115,12 @@ def main() -> int:
     if not source.exists():
         raise FileNotFoundError(f"Missing {source}; run scripts/research_historical.py first")
     trades = pd.read_csv(source)
-    selected, overall, by_symbol, by_period = analyze(trades)
+    selected, overall, by_symbol, by_period, by_context = analyze(trades)
     selected.to_csv(ROOT / "independent-trades.csv", index=False)
     overall.to_csv(ROOT / "independent-summary.csv", index=False)
     by_symbol.to_csv(ROOT / "independent-by-symbol.csv", index=False)
     by_period.to_csv(ROOT / "independent-by-period.csv", index=False)
+    by_context.to_csv(ROOT / "independent-by-context.csv", index=False)
     report = {
         "input_signals": int(len(trades)),
         "non_overlapping_signals": int(len(selected)),
