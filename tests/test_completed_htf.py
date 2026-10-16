@@ -5,7 +5,7 @@ from mercuryedge.upgrades import htf_trend
 
 
 def test_htf_trend_ignores_unfinished_four_hour_bucket():
-    idx = pd.date_range("2026-01-01", periods=900, freq="h", tz="UTC")
+    idx = pd.date_range("2026-01-01", periods=901, freq="h", tz="UTC")
     close = pd.Series(100 + np.arange(len(idx)) * 0.03, index=idx)
     frame = pd.DataFrame({
         "open": close,
