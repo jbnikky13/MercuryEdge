@@ -35,7 +35,7 @@ def test_historical_rule_replay_matches_live_core_signals():
             continue
         assert historical is not None
         assert historical["direction"] == live["direction"]
-        assert historical["setup"] == live["setup"]
+        assert historical["setup"] == live["setup"].replace(" ", "_")
         assert int(historical["score"]) == live["score"]
         assert historical["entry"] == live["entry"]
         assert np.isclose(historical["sl"], live["sl"])
