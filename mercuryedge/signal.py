@@ -46,6 +46,13 @@ def format_signal(name: str, category: str, setup: dict) -> str:
             "",
             "HISTORICAL INTELLIGENCE",
             f"3D HIT RATE: {history_rate}",
+            f"HOLDING WINDOW: {setup.get('holding_period', setup.get('historical_holding_period', 'UNCLASSIFIED')).replace('_', ' ')}",
+            f"1D / 3D / 5D HIT RATES: "
+            f"{(setup.get('historical_win_rate_1d') * 100):.1f}% / "
+            f"{(setup.get('historical_win_rate_3d') * 100):.1f}% / "
+            f"{(setup.get('historical_win_rate_5d') * 100):.1f}%"
+            if all(setup.get(k) is not None for k in ('historical_win_rate_1d', 'historical_win_rate_3d', 'historical_win_rate_5d'))
+            else "1D / 3D / 5D HIT RATES: N/A",
             f"Analogues. {setup.get('historical_samples', 0)}",
             f"Regime. {setup.get('historical_regime') or 'N/A'} / {setup.get('historical_volatility') or 'N/A'}",
             f"Pattern. {setup.get('historical_day') or 'N/A'} + month {setup.get('historical_month') or 'N/A'}",
