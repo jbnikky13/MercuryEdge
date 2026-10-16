@@ -10,7 +10,43 @@ log = logging.getLogger(__name__)
 
 
 def load_market(symbol: str) -> pd.DataFrame:
-    return _download(symbol, PERIOD, INTERVAL)
+    frame = _download(symbol, PERIOD, INTERVAL)
+    return _drop_unfinished_last_bar(frame, INTERVAL)
+
+
+def _drop_unfinished_last_bar(
+    frame: pd.DataFrame,
+    interval: str,
+    now=None,
+) -> pd.DataFrame:
+    """Drop the newest candle if its interval has not fully elapsed.
+
+    Market-data timestamps label candle starts. Using a forming candle can
+    make close/RSI/MACD/ATR and signal levels change before the interval ends.
+    """
+    if frame is None or frame.empty:
+        return pd.DataFrame() if frame is None else frame
+    try:
+        duration = pd.Timedelta(interval)
+    except (TypeError, ValueError):
+        log.warning("Cannot validate candle completion for interval %r", interval)
+        return frame.copy()
+    if duration <= pd.Timedelta(0):
+        log.warning("Cannot validate candle completion for interval %r", interval)
+        return frame.copy()
+
+    out = frame.copy().sort_index()
+    last_start = pd.Timestamp(out.index[-1])
+    last_start = (
+        last_start.tz_localize("UTC")
+        if last_start.tzinfo is None
+        else last_start.tz_convert("UTC")
+    )
+    current = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+    current = current.tz_localize("UTC") if current.tzinfo is None else current.tz_convert("UTC")
+    if last_start + duration > current:
+        return out.iloc[:-1].copy()
+    return out
 
 
 def load_historical(symbol: str) -> pd.DataFrame:
