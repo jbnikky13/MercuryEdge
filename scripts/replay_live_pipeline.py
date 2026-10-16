@@ -136,7 +136,7 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
         return None
     scan_ts = pd.Timestamp(signal["scan_ts"])
     future_start = scan_ts.ceil("h")
-    future = frame[frame.index >= future_start].iloc[:MAX_RESEARCH_HORIZON_HOURS]
+    future = frame[frame.index >= future_start].iloc[:MAX_RESEARCH_HORIZON_BARS]
     if len(future) < SIGNAL_HORIZON_HOURS:
         return None
     risk = abs(float(signal["entry"]) - float(signal["sl"]))
@@ -161,7 +161,7 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
             "tp2": float(signal["tp2"]),
         }),
         future,
-    ) if len(future) >= MAX_RESEARCH_HORIZON_HOURS else None
+    ) if len(future) >= MAX_RESEARCH_HORIZON_BARS else None
 
     side = 1 if signal["direction"] == "BUY" else -1
     tp1_time = tp2_time = stop_time = None
@@ -183,7 +183,7 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
             tp1_time = elapsed_hours
     actual_hours = tp1_time if tp1_time is not None else stop_time
     if actual_hours is None:
-        actual_window = "NOT_REACHED_WITHIN_5_TRADING_DAYS" if len(future) >= MAX_RESEARCH_HORIZON_HOURS else "INSUFFICIENT_FUTURE_DATA"
+        actual_window = "NOT_REACHED_WITHIN_5_TRADING_DAYS" if len(future) >= MAX_RESEARCH_HORIZON_BARS else "INSUFFICIENT_FUTURE_DATA"
     elif actual_hours <= 24:
         actual_window = "0_24H"
     elif actual_hours <= 72:
@@ -394,7 +394,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         "scan_slots_wat": {slot: f"{hour:02d}:{minute:02d}" for slot, (hour, minute) in SLOT_TIMES.items()},
         "entry_reference": "last completed hourly close available at scan time; no contemporaneous 5m execution quote",
         "outcome_horizon_hours": SIGNAL_HORIZON_HOURS,
-        "extended_research_horizon_hours": MAX_RESEARCH_HORIZON_HOURS,
+        "extended_research_horizon_bars": MAX_RESEARCH_HORIZON_BARS,
         "duration_policy": "Select the shortest qualifying historical horizon (1d, 3d, then 5d); report 24h and up-to-five-trading-day outcomes separately and label target/stop timing.",
         "included": [
             "core EMA/RSI/MACD/breakout rules",
