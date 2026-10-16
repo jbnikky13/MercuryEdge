@@ -238,7 +238,14 @@ def main() -> None:
         setup = item["_setup"]
         # The quality gate evaluates a 24h signal, so gate on matured 1-day
         # directional analogue outcomes rather than the old 3-day hit rate.
-        rate = setup.get("historical_win_rate_1d")
+        horizon = setup.get("historical_holding_period", "NO_HORIZON_EDGE")
+        horizon_field = {
+            "INTRADAY_0_24H": "historical_win_rate_1d",
+            "SWING_24_72H": "historical_win_rate_3d",
+            "POSITION_3_5D": "historical_win_rate_5d",
+        }.get(horizon)
+        rate = setup.get(horizon_field) if horizon_field else None
+        setup["holding_period"] = horizon
         filter_sig = {
             "symbol": item["symbol"], "direction": item["direction"],
             "entry": setup.get("entry"), "score": setup.get("score"),
