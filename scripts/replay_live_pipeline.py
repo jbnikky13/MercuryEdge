@@ -108,7 +108,7 @@ def _signal_resolved_before_scan(signal: dict, hourly: dict, scan_ts: pd.Timesta
     frame = hourly.get(signal["symbol"])
     if frame is None or frame.empty:
         return False
-    start = pd.Timestamp(signal["scan_ts"]) + pd.Timedelta(hours=1)
+    start = pd.Timestamp(signal["scan_ts"]).ceil("h")
     cutoff = scan_ts - pd.Timedelta(hours=1)
     future = frame[(frame.index >= start) & (frame.index <= cutoff)]
     side = 1 if signal["direction"] == "BUY" else -1
