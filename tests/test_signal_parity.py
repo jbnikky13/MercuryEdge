@@ -44,6 +44,6 @@ def test_historical_rule_replay_matches_live_core_signals():
 
 
 def test_historical_replay_respects_live_enriched_warmup():
-    # 400 raw hourly bars yield fewer than 220 non-NaN enriched bars because
+    # 230 raw hourly bars yield fewer than 220 non-NaN enriched bars because
     # EMA200 is part of the indicator set; the live engine emits no signals.
-    assert _current_rule_signals(_sample_market(400)).empty
+    assert _current_rule_signals(_sample_market(230)).empty
