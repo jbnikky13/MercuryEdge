@@ -194,5 +194,6 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_volatility": historical.volatility_regime if historical else None,
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
+        "historical_win_rate_1d": historical.win_rate_1d if historical else None,
         "historical_note": historical.note if historical else "Historical engine disabled",
     }
