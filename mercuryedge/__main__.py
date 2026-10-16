@@ -236,8 +236,8 @@ def main() -> None:
     candidate_by_key = {}
     for item in batch_candidates:
         setup = item["_setup"]
-        # The quality gate evaluates a 24h signal, so gate on matured 1-day
-        # directional analogue outcomes rather than the old 3-day hit rate.
+        # Gate on the shortest historical horizon that clears the directional
+        # threshold; slower 3-day and 5-day setups remain eligible, not discarded.
         horizon = setup.get("historical_holding_period", "NO_HORIZON_EDGE")
         horizon_field = {
             "INTRADAY_0_24H": "historical_win_rate_1d",
