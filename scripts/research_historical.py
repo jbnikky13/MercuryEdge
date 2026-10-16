@@ -28,6 +28,10 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty or len(frame) < 220:
         return pd.DataFrame()
     d = add_indicators(frame)
+    # Live analyze() requires 220 enriched bars, not merely 220 raw bars.
+    # Match that warm-up so the historical replay does not invent early signals.
+    if len(d) < 220:
+        return pd.DataFrame()
     prev = d.shift(1)
     strong_bull = (d["EMA20"] > d["EMA50"]) & (d["EMA50"] > d["EMA200"]) & (d["Close"] > d["EMA20"])
     strong_bear = (d["EMA20"] < d["EMA50"]) & (d["EMA50"] < d["EMA200"]) & (d["Close"] < d["EMA20"])
