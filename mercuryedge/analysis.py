@@ -195,5 +195,12 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
         "historical_win_rate_1d": historical.win_rate_1d if historical else None,
+        "historical_win_rate_5d": historical.win_rate_5d if historical else None,
+        "historical_holding_period": (
+            "INTRADAY_0_24H" if historical and historical.win_rate_1d is not None and historical.win_rate_1d >= 0.5
+            else "SWING_24_72H" if historical and historical.win_rate_3d is not None and historical.win_rate_3d >= 0.5
+            else "POSITION_3_5D" if historical and historical.win_rate_5d is not None and historical.win_rate_5d >= 0.5
+            else "NO_HORIZON_EDGE"
+        ),
         "historical_note": historical.note if historical else "Historical engine disabled",
     }
