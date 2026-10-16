@@ -41,13 +41,14 @@ SLOT_TIMES = {
 }
 COOLDOWN_HOURS = 12
 MAX_RESEARCH_HORIZON_BARS = 120  # up to five trading days of hourly bars
+MAX_POSITION_HOLD_HOURS = 120  # conservative wall-clock cap for position setups
 
 
 def _horizon_hours(label: str) -> int:
     return {
         "INTRADAY_0_24H": 24,
         "SWING_24_72H": 72,
-        "POSITION_3_5D": MAX_RESEARCH_HORIZON_HOURS,
+        "POSITION_3_5D": MAX_POSITION_HOLD_HOURS,
     }.get(str(label), 24)
 
 
@@ -150,7 +151,7 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
         }),
         future.iloc[:SIGNAL_HORIZON_HOURS],
     )
-    settlement_120h = _settle_one(
+    settlement_5d = _settle_one(
         pd.Series({
             "direction": signal["direction"],
             "entry": float(signal["entry"]),
@@ -380,8 +381,11 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "entry", "sl", "tp1", "tp2", "historical_samples",
             "historical_win_rate_1d_pct", "historical_win_rate_3d_pct",
             "historical_win_rate_5d_pct", "holding_period", "crossmarket_score", "adx_min",
-            "htf_required", "outcome", "tp1_hit", "tp1_full_R",
-            "tp2_full_R", "half_be_R", "half_sl_R",
+            "htf_required", "outcome", "outcome_24h", "outcome_5d",
+            "tp1_hit", "tp1_full_R", "tp2_full_R", "tp1_full_R_24h",
+            "tp2_full_R_24h", "tp1_full_R_5d", "tp2_full_R_5d",
+            "tp1_time_hours", "tp2_time_hours", "stop_time_hours",
+            "actual_holding_window", "half_be_R", "half_sl_R",
         ])
     trades.to_csv(root / "live-pipeline-replay.csv", index=False)
 
