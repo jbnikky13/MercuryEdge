@@ -72,7 +72,20 @@ def htf_trend(df_1h: pd.DataFrame, fast: int = 50, slow: int = 200):
     if not isinstance(d.index, pd.DatetimeIndex):
         return None
     d = d.sort_index()
-    h4 = d["close"].resample("4h").last().dropna()
+    # Input hourly timestamps represent the start of each hourly candle.
+    # Exclude the current 4h bucket unless all four constituent hours have
+    # elapsed; otherwise the live filter can use a partial higher-timeframe bar.
+    d = d[~d.index.duplicated(keep="last")].sort_index()
+    if d.empty:
+        return None
+    h4 = d["close"].resample("4h", label="left", closed="left").last().dropna()
+    last_hour_start = pd.Timestamp(d.index[-1])
+    if last_hour_start.tzinfo is None:
+        last_hour_start = last_hour_start.tz_localize("UTC")
+    else:
+        last_hour_start = last_hour_start.tz_convert("UTC")
+    last_completed_end = last_hour_start + pd.Timedelta(hours=1)
+    h4 = h4[h4.index + pd.Timedelta(hours=4) <= last_completed_end]
     if len(h4) < slow + 10:
         return None
     fast_ema = h4.ewm(span=fast, adjust=False).mean().iloc[-1]
