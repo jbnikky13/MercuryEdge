@@ -40,7 +40,7 @@ SLOT_TIMES = {
     "evening": (20, 30),
 }
 COOLDOWN_HOURS = 12
-MAX_RESEARCH_HORIZON_HOURS = 120  # up to five trading days of hourly bars
+MAX_RESEARCH_HORIZON_BARS = 120  # up to five trading days of hourly bars
 
 
 def _horizon_hours(label: str) -> int:
@@ -182,21 +182,21 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
             tp1_time = elapsed_hours
     actual_hours = tp1_time if tp1_time is not None else stop_time
     if actual_hours is None:
-        actual_window = "NOT_REACHED_WITHIN_5D" if len(future) >= MAX_RESEARCH_HORIZON_HOURS else "INSUFFICIENT_FUTURE_DATA"
+        actual_window = "NOT_REACHED_WITHIN_5_TRADING_DAYS" if len(future) >= MAX_RESEARCH_HORIZON_HOURS else "INSUFFICIENT_FUTURE_DATA"
     elif actual_hours <= 24:
         actual_window = "0_24H"
     elif actual_hours <= 72:
         actual_window = "24_72H"
     else:
-        actual_window = "72_120H"
+        actual_window = "72H_PLUS"
     return {
         **settlement_24h,
         "outcome_24h": settlement_24h.get("outcome"),
         "tp1_full_R_24h": settlement_24h.get("tp1_full_R"),
         "tp2_full_R_24h": settlement_24h.get("tp2_full_R"),
-        "outcome_120h": settlement_120h.get("outcome") if settlement_120h else None,
-        "tp1_full_R_120h": settlement_120h.get("tp1_full_R") if settlement_120h else None,
-        "tp2_full_R_120h": settlement_120h.get("tp2_full_R") if settlement_120h else None,
+        "outcome_5d": settlement_120h.get("outcome") if settlement_120h else None,
+        "tp1_full_R_5d": settlement_120h.get("tp1_full_R") if settlement_120h else None,
+        "tp2_full_R_5d": settlement_120h.get("tp2_full_R") if settlement_120h else None,
         "tp1_time_hours": tp1_time,
         "tp2_time_hours": tp2_time,
         "stop_time_hours": stop_time,
@@ -391,7 +391,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         "entry_reference": "last completed hourly close available at scan time; no contemporaneous 5m execution quote",
         "outcome_horizon_hours": SIGNAL_HORIZON_HOURS,
         "extended_research_horizon_hours": MAX_RESEARCH_HORIZON_HOURS,
-        "duration_policy": "Select the shortest qualifying historical horizon (1d, 3d, then 5d); report 24h and up-to-120h outcomes separately and label target/stop timing.",
+        "duration_policy": "Select the shortest qualifying historical horizon (1d, 3d, then 5d); report 24h and up-to-five-trading-day outcomes separately and label target/stop timing.",
         "included": [
             "core EMA/RSI/MACD/breakout rules",
             "matured historical analogue context",
@@ -400,7 +400,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "holding-window classification and separate 24-hour versus up-to-120-hour outcome grading",
             "ADX and completed-4h trend gate",
             "12-hour same-symbol cooldown",
-            "duration-aware active-signal exposure (24h, 72h or 120h) and currency exposure cap",
+            "duration-aware active-signal exposure (24h, 72h or 120h wall-clock cap) and currency exposure cap",
             "scheduled market universe and four-setup cap",
         ],
         "omitted_or_approximated": [
