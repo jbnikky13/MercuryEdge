@@ -236,7 +236,9 @@ def main() -> None:
     candidate_by_key = {}
     for item in batch_candidates:
         setup = item["_setup"]
-        rate = setup.get("historical_win_rate_3d")
+        # The quality gate evaluates a 24h signal, so gate on matured 1-day
+        # directional analogue outcomes rather than the old 3-day hit rate.
+        rate = setup.get("historical_win_rate_1d")
         filter_sig = {
             "symbol": item["symbol"], "direction": item["direction"],
             "entry": setup.get("entry"), "score": setup.get("score"),
