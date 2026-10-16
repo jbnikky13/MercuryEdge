@@ -164,21 +164,22 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
 
     side = 1 if signal["direction"] == "BUY" else -1
     tp1_time = tp2_time = stop_time = None
-    for bar_number, (_, candle) in enumerate(future.iterrows(), start=1):
+    for candle_ts, candle in future.iterrows():
+        elapsed_hours = max(1, int(np.ceil((candle_ts + pd.Timedelta(hours=1) - scan_ts).total_seconds() / 3600)))
         high, low = float(candle["High"]), float(candle["Low"])
         stop_hit = low <= signal["sl"] if side == 1 else high >= signal["sl"]
         tp1_hit = high >= signal["tp1"] if side == 1 else low <= signal["tp1"]
         tp2_hit = high >= signal["tp2"] if side == 1 else low <= signal["tp2"]
         # Conservative stop-first ordering for ambiguous hourly candles.
         if stop_hit:
-            stop_time = bar_number
+            stop_time = elapsed_hours
             break
         if tp2_hit:
-            tp1_time = tp1_time or bar_number
-            tp2_time = bar_number
+            tp1_time = tp1_time or elapsed_hours
+            tp2_time = elapsed_hours
             break
         if tp1_hit and tp1_time is None:
-            tp1_time = bar_number
+            tp1_time = elapsed_hours
     actual_hours = tp1_time if tp1_time is not None else stop_time
     if actual_hours is None:
         actual_window = "NOT_REACHED_WITHIN_5D" if len(future) >= MAX_RESEARCH_HORIZON_HOURS else "INSUFFICIENT_FUTURE_DATA"
@@ -357,7 +358,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
                     float(setup["historical_win_rate_5d"]) * 100
                     if setup.get("historical_win_rate_5d") is not None else None
                 ),
-                "holding_period": horizon,
+                "holding_period": setup.get("historical_holding_period", "NO_HORIZON_EDGE"),
                 "crossmarket_score": int(setup.get("crossmarket_score") or 0),
                 "adx_min": MIN_ADX,
                 "htf_required": REQUIRE_HTF_TREND,
@@ -399,7 +400,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "holding-window classification and separate 24-hour versus up-to-120-hour outcome grading",
             "ADX and completed-4h trend gate",
             "12-hour same-symbol cooldown",
-            "24-hour active-signal exposure and currency exposure cap",
+            "duration-aware active-signal exposure (24h, 72h or 120h) and currency exposure cap",
             "scheduled market universe and four-setup cap",
         ],
         "omitted_or_approximated": [
