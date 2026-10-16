@@ -58,6 +58,12 @@ jobs:
           DURATION_WF_MIN_TRAIN_EDGE_R: "0.02"
           DURATION_WF_COSTS_R: "0,0.05,0.10"
         run: python scripts/walk_forward_duration_validation.py
+      - name: Stress-test duration selector thresholds
+        env:
+          DURATION_ROBUST_MIN_COUNTS: "8,12,16,20"
+          DURATION_ROBUST_MIN_EDGES_R: "0.02,0.05,0.10"
+          DURATION_ROBUST_COST_R: "0.05"
+        run: python scripts/duration_selector_robustness.py
       - name: Upload historical research artifact
         if: always()
         uses: actions/upload-artifact@v4
