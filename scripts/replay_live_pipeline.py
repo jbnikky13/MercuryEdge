@@ -224,7 +224,8 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         filter_candidates, candidate_by_key = [], {}
         for item in candidates:
             setup = item["_setup"]
-            rate = setup.get("historical_win_rate_3d")
+            # Match the live quality gate to the 24h signal horizon.
+            rate = setup.get("historical_win_rate_1d")
             sig = {
                 "symbol": item["symbol"],
                 "direction": item["direction"],
@@ -279,6 +280,10 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
                 "tp1": float(setup["tp1"]),
                 "tp2": float(setup["tp2"]),
                 "historical_samples": int(setup.get("historical_samples") or 0),
+                "historical_win_rate_1d_pct": (
+                    float(setup["historical_win_rate_1d"]) * 100
+                    if setup.get("historical_win_rate_1d") is not None else None
+                ),
                 "historical_win_rate_3d_pct": (
                     float(setup["historical_win_rate_3d"]) * 100
                     if setup.get("historical_win_rate_3d") is not None else None
@@ -302,7 +307,8 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         trades = pd.DataFrame(columns=[
             "scan_ts", "slot", "symbol", "direction", "score", "setup",
             "entry", "sl", "tp1", "tp2", "historical_samples",
-            "historical_win_rate_3d_pct", "crossmarket_score", "adx_min",
+            "historical_win_rate_1d_pct", "historical_win_rate_3d_pct",
+            "crossmarket_score", "adx_min",
             "htf_required", "outcome", "tp1_hit", "tp1_full_R",
             "tp2_full_R", "half_be_R", "half_sl_R",
         ])
@@ -317,7 +323,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "core EMA/RSI/MACD/breakout rules",
             "matured historical analogue context",
             "rolling cross-market context",
-            "score/hit-rate/analogue quality gate",
+            "score/1-day directional hit-rate/analogue quality gate",
             "ADX and completed-4h trend gate",
             "12-hour same-symbol cooldown",
             "24-hour active-signal exposure and currency exposure cap",
