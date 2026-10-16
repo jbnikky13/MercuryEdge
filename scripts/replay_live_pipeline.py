@@ -40,6 +40,15 @@ SLOT_TIMES = {
     "evening": (20, 30),
 }
 COOLDOWN_HOURS = 12
+MAX_RESEARCH_HORIZON_HOURS = 120  # up to five trading days of hourly bars
+
+
+def _horizon_hours(label: str) -> int:
+    return {
+        "INTRADAY_0_24H": 24,
+        "SWING_24_72H": 72,
+        "POSITION_3_5D": MAX_RESEARCH_HORIZON_HOURS,
+    }.get(str(label), 24)
 
 
 def _read_market(path: Path) -> pd.DataFrame:
@@ -126,11 +135,22 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
         return None
     scan_ts = pd.Timestamp(signal["scan_ts"])
     future_start = scan_ts.ceil("h")
-    future = frame[frame.index >= future_start].iloc[:SIGNAL_HORIZON_HOURS]
+    future = frame[frame.index >= future_start].iloc[:MAX_RESEARCH_HORIZON_HOURS]
     if len(future) < SIGNAL_HORIZON_HOURS:
         return None
     risk = abs(float(signal["entry"]) - float(signal["sl"]))
-    settlement = _settle_one(
+    settlement_24h = _settle_one(
+        pd.Series({
+            "direction": signal["direction"],
+            "entry": float(signal["entry"]),
+            "risk": risk,
+            "sl": float(signal["sl"]),
+            "tp1": float(signal["tp1"]),
+            "tp2": float(signal["tp2"]),
+        }),
+        future.iloc[:SIGNAL_HORIZON_HOURS],
+    )
+    settlement_120h = _settle_one(
         pd.Series({
             "direction": signal["direction"],
             "entry": float(signal["entry"]),
@@ -140,8 +160,47 @@ def _settle_selected(signal: dict, hourly: dict) -> dict | None:
             "tp2": float(signal["tp2"]),
         }),
         future,
-    )
-    return settlement
+    ) if len(future) >= MAX_RESEARCH_HORIZON_HOURS else None
+
+    side = 1 if signal["direction"] == "BUY" else -1
+    tp1_time = tp2_time = stop_time = None
+    for bar_number, (_, candle) in enumerate(future.iterrows(), start=1):
+        high, low = float(candle["High"]), float(candle["Low"])
+        stop_hit = low <= signal["sl"] if side == 1 else high >= signal["sl"]
+        tp1_hit = high >= signal["tp1"] if side == 1 else low <= signal["tp1"]
+        tp2_hit = high >= signal["tp2"] if side == 1 else low <= signal["tp2"]
+        # Conservative stop-first ordering for ambiguous hourly candles.
+        if stop_hit:
+            stop_time = bar_number
+            break
+        if tp2_hit:
+            tp1_time = tp1_time or bar_number
+            tp2_time = bar_number
+            break
+        if tp1_hit and tp1_time is None:
+            tp1_time = bar_number
+    actual_hours = tp1_time if tp1_time is not None else stop_time
+    if actual_hours is None:
+        actual_window = "NOT_REACHED_WITHIN_5D" if len(future) >= MAX_RESEARCH_HORIZON_HOURS else "INSUFFICIENT_FUTURE_DATA"
+    elif actual_hours <= 24:
+        actual_window = "0_24H"
+    elif actual_hours <= 72:
+        actual_window = "24_72H"
+    else:
+        actual_window = "72_120H"
+    return {
+        **settlement_24h,
+        "outcome_24h": settlement_24h.get("outcome"),
+        "tp1_full_R_24h": settlement_24h.get("tp1_full_R"),
+        "tp2_full_R_24h": settlement_24h.get("tp2_full_R"),
+        "outcome_120h": settlement_120h.get("outcome") if settlement_120h else None,
+        "tp1_full_R_120h": settlement_120h.get("tp1_full_R") if settlement_120h else None,
+        "tp2_full_R_120h": settlement_120h.get("tp2_full_R") if settlement_120h else None,
+        "tp1_time_hours": tp1_time,
+        "tp2_time_hours": tp2_time,
+        "stop_time_hours": stop_time,
+        "actual_holding_window": actual_window,
+    }
 
 
 def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
@@ -225,7 +284,13 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         for item in candidates:
             setup = item["_setup"]
             # Match the live quality gate to the 24h signal horizon.
-            rate = setup.get("historical_win_rate_1d")
+            horizon = setup.get("historical_holding_period", "NO_HORIZON_EDGE")
+            horizon_field = {
+                "INTRADAY_0_24H": "historical_win_rate_1d",
+                "SWING_24_72H": "historical_win_rate_3d",
+                "POSITION_3_5D": "historical_win_rate_5d",
+            }.get(horizon)
+            rate = setup.get(horizon_field) if horizon_field else None
             sig = {
                 "symbol": item["symbol"],
                 "direction": item["direction"],
@@ -253,7 +318,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
 
         active_signals = [
             signal for signal in active_signals
-            if scan_ts - pd.Timestamp(signal["scan_ts"]) < pd.Timedelta(hours=SIGNAL_HORIZON_HOURS)
+            if scan_ts - pd.Timestamp(signal["scan_ts"]) < pd.Timedelta(hours=_horizon_hours(signal.get("holding_period", "INTRADAY_0_24H")))
             and not _signal_resolved_before_scan(signal, hourly, scan_ts)
         ]
         selected, _skipped = select_setups(
@@ -288,6 +353,11 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
                     float(setup["historical_win_rate_3d"]) * 100
                     if setup.get("historical_win_rate_3d") is not None else None
                 ),
+                "historical_win_rate_5d_pct": (
+                    float(setup["historical_win_rate_5d"]) * 100
+                    if setup.get("historical_win_rate_5d") is not None else None
+                ),
+                "holding_period": horizon,
                 "crossmarket_score": int(setup.get("crossmarket_score") or 0),
                 "adx_min": MIN_ADX,
                 "htf_required": REQUIRE_HTF_TREND,
@@ -308,7 +378,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "scan_ts", "slot", "symbol", "direction", "score", "setup",
             "entry", "sl", "tp1", "tp2", "historical_samples",
             "historical_win_rate_1d_pct", "historical_win_rate_3d_pct",
-            "crossmarket_score", "adx_min",
+            "historical_win_rate_5d_pct", "holding_period", "crossmarket_score", "adx_min",
             "htf_required", "outcome", "tp1_hit", "tp1_full_R",
             "tp2_full_R", "half_be_R", "half_sl_R",
         ])
@@ -319,11 +389,14 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
         "scan_slots_wat": {slot: f"{hour:02d}:{minute:02d}" for slot, (hour, minute) in SLOT_TIMES.items()},
         "entry_reference": "last completed hourly close available at scan time; no contemporaneous 5m execution quote",
         "outcome_horizon_hours": SIGNAL_HORIZON_HOURS,
+        "extended_research_horizon_hours": MAX_RESEARCH_HORIZON_HOURS,
+        "duration_policy": "Select the shortest qualifying historical horizon (1d, 3d, then 5d); report 24h and up-to-120h outcomes separately and label target/stop timing.",
         "included": [
             "core EMA/RSI/MACD/breakout rules",
             "matured historical analogue context",
             "rolling cross-market context",
-            "score/1-day directional hit-rate/analogue quality gate",
+            "score plus shortest qualifying 1-day, 3-day or 5-day directional analogue hit-rate gate",
+            "holding-window classification and separate 24-hour versus up-to-120-hour outcome grading",
             "ADX and completed-4h trend gate",
             "12-hour same-symbol cooldown",
             "24-hour active-signal exposure and currency exposure cap",
@@ -334,7 +407,7 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
             "historical 5-minute executable quotes and live feed-deviation check",
             "adaptive calibration modifiers (no point-in-time calibration snapshots)",
             "broker spread, slippage, financing and instrument contract mapping",
-            "signal status transitions are approximated as active until SL/TP2 or 24h",
+            "signal status transitions are approximated as active until SL/TP2 or the analogue-selected 24h/72h/120h window",
         ],
         "data_provider": "Yahoo Finance hourly/daily candles; research proxy only",
         "warning": "Research-only replay. Do not enable live trading based on this artifact alone.",
