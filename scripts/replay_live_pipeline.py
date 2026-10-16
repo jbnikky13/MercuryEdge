@@ -298,7 +298,15 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
     if not trades.empty:
         trades["scan_ts"] = pd.to_datetime(trades["scan_ts"], utc=True)
         trades = trades.sort_values(["scan_ts", "symbol"]).reset_index(drop=True)
-        trades.to_csv(root / "live-pipeline-replay.csv", index=False)
+    else:
+        trades = pd.DataFrame(columns=[
+            "scan_ts", "slot", "symbol", "direction", "score", "setup",
+            "entry", "sl", "tp1", "tp2", "historical_samples",
+            "historical_win_rate_3d_pct", "crossmarket_score", "adx_min",
+            "htf_required", "outcome", "tp1_hit", "tp1_full_R",
+            "tp2_full_R", "half_be_R", "half_sl_R",
+        ])
+    trades.to_csv(root / "live-pipeline-replay.csv", index=False)
 
     report = {
         "replayed_selected_signals": int(len(trades)),
