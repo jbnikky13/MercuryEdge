@@ -236,7 +236,16 @@ def main() -> None:
     candidate_by_key = {}
     for item in batch_candidates:
         setup = item["_setup"]
-        rate = setup.get("historical_win_rate_3d")
+        # Gate on the shortest historical horizon that clears the directional
+        # threshold; slower 3-day and 5-day setups remain eligible, not discarded.
+        horizon = setup.get("historical_holding_period", "NO_HORIZON_EDGE")
+        horizon_field = {
+            "INTRADAY_0_24H": "historical_win_rate_1d",
+            "SWING_24_72H": "historical_win_rate_3d",
+            "POSITION_3_5D": "historical_win_rate_5d",
+        }.get(horizon)
+        rate = setup.get(horizon_field) if horizon_field else None
+        setup["holding_period"] = horizon
         filter_sig = {
             "symbol": item["symbol"], "direction": item["direction"],
             "entry": setup.get("entry"), "score": setup.get("score"),
@@ -329,6 +338,7 @@ def main() -> None:
                 "regime_htf_agree": features["htf_agree"],
                 "atr_pct": features["atr_pct"],
                 "risk_pct": features["risk_pct"],
+                "entry_stretch_atr": features["entry_stretch_atr"],
                 "rr_tp1": features["rr_tp1"],
                 "rr_tp2": features["rr_tp2"],
                 "hour_utc": features["hour_utc"],

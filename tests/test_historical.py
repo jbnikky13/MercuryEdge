@@ -43,6 +43,12 @@ def test_history_is_directional():
     assert buy.win_rate_3d is not None
     assert sell.win_rate_3d is not None
     assert np.isclose(buy.win_rate_3d + sell.win_rate_3d, 1.0)
+    assert buy.win_rate_1d is not None
+    assert sell.win_rate_1d is not None
+    assert np.isclose(buy.win_rate_1d + sell.win_rate_1d, 1.0)
+    assert buy.win_rate_5d is not None
+    assert sell.win_rate_5d is not None
+    assert np.isclose(buy.win_rate_5d + sell.win_rate_5d, 1.0)
 
 
 
@@ -57,4 +63,6 @@ def test_forward_labels_from_after_query_cannot_change_context():
 
     assert baseline.sample_size == altered.sample_size
     assert baseline.win_rate_3d == altered.win_rate_3d
+    assert baseline.win_rate_1d == altered.win_rate_1d
+    assert baseline.win_rate_5d == altered.win_rate_5d
     assert baseline.score == altered.score

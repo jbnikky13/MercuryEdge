@@ -44,8 +44,30 @@ def format_signal(name: str, category: str, setup: dict) -> str:
             f"SETUP. {setup['setup']}",
             f"SCORE. {setup['score']}/100",
             "",
+            "SETUP QUALITY CHECKS",
+            f"ADX. {setup.get('regime_adx'):.1f}" if isinstance(setup.get("regime_adx"), (int, float)) else "ADX. N/A",
+            f"4H TREND. {setup.get('regime_htf_trend') or 'N/A'} / {'ALIGNED' if setup.get('regime_htf_agree') else 'NOT ALIGNED'}",
+            (
+                f"ATR VOLATILITY. {setup.get('atr_pct'):.2f}% | STOP DISTANCE. {setup.get('risk_pct'):.2f}%"
+                if isinstance(setup.get("atr_pct"), (int, float)) and isinstance(setup.get("risk_pct"), (int, float))
+                else "ATR VOLATILITY / STOP DISTANCE. N/A"
+            ),
+            (
+                f"ENTRY STRETCH FROM EMA20. {setup.get('entry_stretch_atr'):.2f} ATR"
+                if isinstance(setup.get("entry_stretch_atr"), (int, float))
+                else "ENTRY STRETCH FROM EMA20. N/A"
+            ),
+            "Quality gates: ADX, 4H trend alignment, currency exposure and duplicate/feed checks.",
+            "",
             "HISTORICAL INTELLIGENCE",
             f"3D HIT RATE: {history_rate}",
+            f"HOLDING WINDOW: {setup.get('holding_period', setup.get('historical_holding_period', 'UNCLASSIFIED')).replace('_', ' ')}",
+            f"1D / 3D / 5D HIT RATES: "
+            f"{(setup.get('historical_win_rate_1d') * 100):.1f}% / "
+            f"{(setup.get('historical_win_rate_3d') * 100):.1f}% / "
+            f"{(setup.get('historical_win_rate_5d') * 100):.1f}%"
+            if all(setup.get(k) is not None for k in ('historical_win_rate_1d', 'historical_win_rate_3d', 'historical_win_rate_5d'))
+            else "1D / 3D / 5D HIT RATES: N/A",
             f"Analogues. {setup.get('historical_samples', 0)}",
             f"Regime. {setup.get('historical_regime') or 'N/A'} / {setup.get('historical_volatility') or 'N/A'}",
             f"Pattern. {setup.get('historical_day') or 'N/A'} + month {setup.get('historical_month') or 'N/A'}",

@@ -252,6 +252,13 @@ def build_features(
         "htf_agree": bool(info["htf_agree"]),
         "atr_pct": _f(atr(df_1h).iloc[-1] / price * 100, 4) if price else None,
         "risk_pct": _f(risk / float(entry) * 100, 4) if entry else None,
+        # Diagnostic only: quantifies how far price has stretched from its
+        # short-term mean in volatility units; it does not block a signal.
+        "entry_stretch_atr": _f(
+            abs(price - float(d["close"].ewm(span=20, adjust=False).mean().iloc[-1]))
+            / float(atr(d).iloc[-1]),
+            3,
+        ) if price and float(atr(d).iloc[-1]) > 0 else None,
         "rr_tp1": _f(abs(float(tp1) - float(entry)) / risk, 3) if risk else None,
         "rr_tp2": _f(abs(float(tp2) - float(entry)) / risk, 3) if risk else None,
         "hour_utc": int(t.hour),

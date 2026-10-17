@@ -49,6 +49,8 @@ def test_selection_and_features():
     features = build_features("EURUSD", "BUY", 1.1, 1.095, 1.10575, 1.1115, 80, up)
     assert features["htf_agree"] is True
     assert features["rr_tp2"] is not None
+    assert features["entry_stretch_atr"] is not None
+    assert features["entry_stretch_atr"] >= 0
 
 
 def test_exit_and_walkforward():
