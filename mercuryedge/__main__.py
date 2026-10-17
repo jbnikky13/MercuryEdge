@@ -338,6 +338,7 @@ def main() -> None:
                 "regime_htf_agree": features["htf_agree"],
                 "atr_pct": features["atr_pct"],
                 "risk_pct": features["risk_pct"],
+                "entry_stretch_atr": features["entry_stretch_atr"],
                 "rr_tp1": features["rr_tp1"],
                 "rr_tp2": features["rr_tp2"],
                 "hour_utc": features["hour_utc"],
