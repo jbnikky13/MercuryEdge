@@ -15,7 +15,7 @@ def _setup(**overrides):
         "crossmarket_relationships": ["DXY inverse"], "adaptive_historical_modifier": 0,
         "adaptive_crossmarket_modifier": 0, "adaptive_agreement_modifier": 0,
         "regime_adx": 27.4, "regime_htf_trend": "BUY",
-        "regime_htf_agree": True, "atr_pct": 0.42, "risk_pct": 0.63,
+        "regime_htf_agree": True, "atr_pct": 0.42, "risk_pct": 0.63, "entry_stretch_atr": 1.37,
     }
     setup.update(overrides)
     return setup
@@ -27,6 +27,7 @@ def test_signal_shows_regime_and_risk_diagnostics():
     assert "ADX. 27.4" in message
     assert "4H TREND. BUY / ALIGNED" in message
     assert "ATR VOLATILITY. 0.42% | STOP DISTANCE. 0.63%" in message
+    assert "ENTRY STRETCH FROM EMA20. 1.37 ATR" in message
     assert "Quality gates: ADX, 4H trend alignment, currency exposure and duplicate/feed checks." in message
 
 
@@ -34,7 +35,8 @@ def test_signal_format_handles_missing_diagnostics():
     message = format_signal(
         "EURUSD", "forex",
         _setup(regime_adx=None, regime_htf_trend=None, regime_htf_agree=None,
-               atr_pct=None, risk_pct=None),
+               atr_pct=None, risk_pct=None, entry_stretch_atr=None),
     )
     assert "ADX. N/A" in message
     assert "ATR VOLATILITY / STOP DISTANCE. N/A" in message
+    assert "ENTRY STRETCH FROM EMA20. N/A" in message
