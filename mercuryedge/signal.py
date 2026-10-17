@@ -52,6 +52,11 @@ def format_signal(name: str, category: str, setup: dict) -> str:
                 if isinstance(setup.get("atr_pct"), (int, float)) and isinstance(setup.get("risk_pct"), (int, float))
                 else "ATR VOLATILITY / STOP DISTANCE. N/A"
             ),
+            (
+                f"ENTRY STRETCH FROM EMA20. {setup.get('entry_stretch_atr'):.2f} ATR"
+                if isinstance(setup.get("entry_stretch_atr"), (int, float))
+                else "ENTRY STRETCH FROM EMA20. N/A"
+            ),
             "Quality gates: ADX, 4H trend alignment, currency exposure and duplicate/feed checks.",
             "",
             "HISTORICAL INTELLIGENCE",
