@@ -62,6 +62,17 @@ def _summary(values: pd.Series) -> dict:
     }
 
 
+def _future_window(frame: pd.DataFrame, signal_ts: pd.Timestamp, bars: int) -> pd.DataFrame:
+    """Return only bars strictly after the signal timestamp (no signal-candle look-ahead)."""
+    ts = pd.Timestamp(signal_ts)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    else:
+        ts = ts.tz_convert("UTC")
+    start = frame.index.searchsorted(ts, side="right")
+    return frame.iloc[start : start + bars]
+
+
 def replay_variants(trades: pd.DataFrame, root: Path = ROOT) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     required = {"scan_ts", "symbol", "direction", "entry", "sl"}
     missing = sorted(required - set(trades.columns))
@@ -81,10 +92,9 @@ def replay_variants(trades: pd.DataFrame, root: Path = ROOT) -> tuple[pd.DataFra
         frame.index = pd.to_datetime(frame.index, utc=True)
         frame = frame[~frame.index.duplicated(keep="last")].sort_index()
         frame = frame.dropna(subset=["Open", "High", "Low", "Close"])
-        future = frame[frame.index >= ts.ceil("h")]
         for label, spec in VARIANTS.items():
             variant = build_variant(signal, label)
-            window = future.iloc[:spec["bars"]]
+            window = _future_window(frame, ts, spec["bars"])
             if len(window) < spec["bars"]:
                 continue
             settled = _settle_one(pd.Series({
@@ -129,7 +139,7 @@ def replay_variants(trades: pd.DataFrame, root: Path = ROOT) -> tuple[pd.DataFra
         "variant_rows": int(len(results)),
         "duration_variants": VARIANTS,
         "exit_geometry": "ATR-risk proxy inferred from baseline stop distance; TP1=1.15R and TP2=2.25R",
-        "grading": "Each variant graded independently over its declared future hourly-bar horizon; stop-first tie break inherited from historical replay.",
+        "grading": "Each variant graded independently over up to 24/72/120 future hourly bars (not guaranteed calendar hours); bars timestamped at or before signal time are excluded; stop-first tie break inherited from historical replay.",
         "cost_scenarios_R": list(COSTS_R),
         "selection_uses_future_outcomes": False,
         "selection_policy": "No variant is selected in this experiment; this is a parallel exit-geometry ablation.",
@@ -137,6 +147,7 @@ def replay_variants(trades: pd.DataFrame, root: Path = ROOT) -> tuple[pd.DataFra
             "Entry signals are inherited from the current pipeline, so this does not generate independent entry strategies.",
             "Risk multipliers are research hypotheses, not fitted or validated live parameters.",
             "Hourly Yahoo Finance OHLC proxy; no broker fills, spread, slippage, funding or contract mapping.",
+            "Horizons count available future hourly bars; market closures mean they are not exact elapsed calendar-hour durations.",
             "Overlapping entries and correlated markets remain possible; summary metrics are descriptive, not proof of profitability.",
         ],
         "research_only": True,
