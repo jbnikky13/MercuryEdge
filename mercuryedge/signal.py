@@ -44,6 +44,16 @@ def format_signal(name: str, category: str, setup: dict) -> str:
             f"SETUP. {setup['setup']}",
             f"SCORE. {setup['score']}/100",
             "",
+            "SETUP QUALITY CHECKS",
+            f"ADX. {setup.get('regime_adx'):.1f}" if isinstance(setup.get("regime_adx"), (int, float)) else "ADX. N/A",
+            f"4H TREND. {setup.get('regime_htf_trend') or 'N/A'} / {'ALIGNED' if setup.get('regime_htf_agree') else 'NOT ALIGNED'}",
+            (
+                f"ATR VOLATILITY. {setup.get('atr_pct'):.2f}% | STOP DISTANCE. {setup.get('risk_pct'):.2f}%"
+                if isinstance(setup.get("atr_pct"), (int, float)) and isinstance(setup.get("risk_pct"), (int, float))
+                else "ATR VOLATILITY / STOP DISTANCE. N/A"
+            ),
+            "Quality gates: ADX, 4H trend alignment, currency exposure and duplicate/feed checks.",
+            "",
             "HISTORICAL INTELLIGENCE",
             f"3D HIT RATE: {history_rate}",
             f"HOLDING WINDOW: {setup.get('holding_period', setup.get('historical_holding_period', 'UNCLASSIFIED')).replace('_', ' ')}",
