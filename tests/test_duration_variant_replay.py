@@ -1,6 +1,8 @@
 import pytest
 
-from scripts.duration_variant_replay import build_variant
+import pandas as pd
+
+from scripts.duration_variant_replay import _future_window, build_variant
 
 
 def test_variants_create_distinct_entry_time_exit_geometry():
@@ -30,3 +32,17 @@ def test_invalid_risk_and_duration_fail_closed():
         build_variant({"direction": "BUY", "entry": 1.1, "sl": 1.1}, "INTRADAY_0_24H")
     with pytest.raises(ValueError):
         build_variant({"direction": "BUY", "entry": 1.1, "sl": 1.09}, "UNKNOWN")
+
+
+def test_future_window_excludes_signal_candle_even_when_timestamp_is_exact_hour():
+    index = pd.date_range("2025-01-01T00:00:00Z", periods=5, freq="h")
+    frame = pd.DataFrame({"Close": range(5)}, index=index)
+    window = _future_window(frame, pd.Timestamp("2025-01-01T02:00:00Z"), 2)
+    assert list(window["Close"]) == [3, 4]
+
+
+def test_future_window_starts_at_next_bar_for_mid_hour_signal():
+    index = pd.date_range("2025-01-01T00:00:00Z", periods=5, freq="h")
+    frame = pd.DataFrame({"Close": range(5)}, index=index)
+    window = _future_window(frame, pd.Timestamp("2025-01-01T02:30:00Z"), 2)
+    assert list(window["Close"]) == [3, 4]
