@@ -45,7 +45,7 @@ jobs:
           WALK_FORWARD_MIN_TRAIN_TRADES: "30"
           WALK_FORWARD_SELECTION_COST_R: "0.05"
           WALK_FORWARD_MIN_TRAIN_EDGE_R: "0.02"
-          WALK_FORWARD_COSTS_R: "0,0.05,0.10"
+          WALK_FORWARD_COSTS_R: "0,0.05,0.10,0.15,0.20"
         run: python scripts/walk_forward_validation.py
       - name: Validate duration-aware selector on matured five-day outcomes
         env:
@@ -56,7 +56,7 @@ jobs:
           DURATION_WF_MIN_TRAIN_TRADES: "8"
           DURATION_WF_SELECTION_COST_R: "0.05"
           DURATION_WF_MIN_TRAIN_EDGE_R: "0.02"
-          DURATION_WF_COSTS_R: "0,0.05,0.10"
+          DURATION_WF_COSTS_R: "0,0.05,0.10,0.15,0.20"
         run: python scripts/walk_forward_duration_validation.py
       - name: Stress-test duration selector thresholds
         env:
@@ -64,6 +64,8 @@ jobs:
           DURATION_ROBUST_MIN_EDGES_R: "0.02,0.05,0.10"
           DURATION_ROBUST_COST_R: "0.05"
         run: python scripts/duration_selector_robustness.py
+      - name: Analyze out-of-sample market breakdown and cost stress
+        run: python scripts/duration_oos_diagnostics.py
       - name: Upload historical research artifact
         if: always()
         uses: actions/upload-artifact@v4
