@@ -87,7 +87,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mercuryedge-historical-research-\${{ github.run_number }}
+          name: mercuryedge-historical-research-${{ github.run_number }}
           path: research_data/
           if-no-files-found: warn
           retention-days: 90
