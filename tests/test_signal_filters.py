@@ -41,6 +41,7 @@ def test_weak_or_conflicting_signal_is_rejected():
 
 def test_feed_mismatch_and_missing_feed_are_rejected():
     assert check_signal(signal(), price_lookup=lambda _symbol: None)[0] is False
+    assert check_signal(signal(), price_lookup=lambda _symbol: 1.101)[0] is False
     assert check_signal(signal(), price_lookup=lambda _symbol: {"price": 1.20, "timestamp": "2026-10-18T10:00:00+00:00", "age_minutes": 1})[0] is False
     assert check_signal(signal(), price_lookup=lambda _symbol: {"price": 1.101, "timestamp": "2026-10-18T10:00:00+00:00", "age_minutes": 1})[0] is True
     assert check_signal(signal(), price_lookup=lambda _symbol: {"price": 1.101, "timestamp": "2026-10-18T10:00:00+00:00", "age_minutes": 16})[0] is False
