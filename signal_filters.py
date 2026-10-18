@@ -4,6 +4,7 @@ The thresholds are research safeguards fitted on a small sample, not guarantees.
 Run: python signal_filters.py audit-results.csv
 """
 import sys
+import math
 
 MIN_SCORE = 65
 MIN_HIT_RATE = 50.0
@@ -16,7 +17,11 @@ BLOCK_RANGE_REGIME = False
 PAUSED = {("VIX", "SELL"), ("DXY", "BUY")}
 
 
-def np_isfinite_positive(value):\n    return math.isfinite(value) and value > 0\n\n\ndef check_signal(sig, price_lookup=None):
+def np_isfinite_positive(value):
+    return math.isfinite(value) and value > 0
+
+
+def check_signal(sig, price_lookup=None):
     """Return (accepted, reason). Missing/invalid evidence fails closed."""
     symbol = str(sig.get("symbol", "")).upper()
     direction = str(sig.get("direction", "")).upper()
