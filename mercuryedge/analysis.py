@@ -139,6 +139,31 @@ def _walkforward_approved() -> bool:
         return False
 
 
+def _historical_holding_period(historical: HistoricalContext | None) -> str:
+    """Use a conservative horizon label only when analogue evidence is credible.
+
+    Directional close-to-close hit rates are not trade win probabilities. Avoid
+    selecting a horizon from a barely-coin-flip rate or a tiny analogue sample.
+    """
+    if historical is None:
+        return "NO_HORIZON_EDGE"
+    if historical.sample_size < 40 or historical.confidence < 0.2:
+        return "NO_HORIZON_EDGE"
+
+    horizons = (
+        ("INTRADAY_0_24H", historical.win_rate_1d, historical.avg_1d_return),
+        ("SWING_24_72H", historical.win_rate_3d, historical.avg_3d_return),
+        ("POSITION_3_5D", historical.win_rate_5d, historical.avg_5d_return),
+    )
+    for label, hit_rate, mean_return in horizons:
+        if (
+            hit_rate is not None and hit_rate >= 0.55
+            and mean_return is not None and mean_return > 0
+        ):
+            return label
+    return "NO_HORIZON_EDGE"
+
+
 def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
     if len(df) < 220:
         return None
@@ -211,11 +236,6 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
         "historical_win_rate_1d": historical.win_rate_1d if historical else None,
         "historical_win_rate_5d": historical.win_rate_5d if historical else None,
-        "historical_holding_period": (
-            "INTRADAY_0_24H" if historical and historical.win_rate_1d is not None and historical.win_rate_1d >= 0.5
-            else "SWING_24_72H" if historical and historical.win_rate_3d is not None and historical.win_rate_3d >= 0.5
-            else "POSITION_3_5D" if historical and historical.win_rate_5d is not None and historical.win_rate_5d >= 0.5
-            else "NO_HORIZON_EDGE"
-        ),
+        "historical_holding_period": _historical_holding_period(historical),
         "historical_note": historical.note if historical else "Historical engine disabled",
     }
