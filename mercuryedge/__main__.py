@@ -24,7 +24,7 @@ from .news import nfp_risk, should_reduce_risk
 from .signal import format_bulletin, send_telegram
 from .upgrades import build_features, select_setups
 from signal_filters import filter_batch
-from market_data import get_live_price
+from market_data import get_live_quote
 from scheduler import BATCHES
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -248,7 +248,7 @@ def main() -> None:
         setup["holding_period"] = horizon
         filter_sig = {
             "symbol": item["symbol"], "direction": item["direction"],
-            "entry": setup.get("entry"), "score": setup.get("score"),
+            "entry": setup.get("entry"), "atr": setup.get("atr"), "score": setup.get("score"),
             "hit_rate": float(rate) * 100 if rate is not None else None,
             "analogues": setup.get("historical_samples"),
             "regime": setup.get("historical_regime"),
@@ -260,7 +260,7 @@ def main() -> None:
 
     kept, dropped = filter_batch(
         filter_candidates,
-        price_lookup=get_live_price,
+        price_lookup=get_live_quote,
         already_sent_today=recent_symbols,
     )
     eligible_candidates = [
