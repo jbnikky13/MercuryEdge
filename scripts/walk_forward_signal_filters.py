@@ -39,7 +39,8 @@ def _profit_factor(values: pd.Series):
     gains = float(values[values > 0].sum())
     losses = float(-values[values < 0].sum())
     if losses <= 0:
-        return float("inf") if gains > 0 else None
+        # Undefined PF is not treated as infinite evidence of an edge.
+        return None
     return gains / losses
 
 
@@ -165,8 +166,43 @@ def evaluate(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
             "mean_oos_fold_return_R": round(float(np.mean(fold_means)), 5) if fold_means else None,
             "positive_oos_folds_pct": round(float(np.mean(np.array(fold_means) > 0) * 100), 2) if fold_means else None,
         })
+    by_cost = {round(row["assumed_cost_R"], 2): row for row in fold_metrics}
+    at_010 = by_cost.get(0.10, {})
+    at_015 = by_cost.get(0.15, {})
+    selected_n = int(at_010.get("walk_forward_selected_trades") or 0)
+    mean_010 = at_010.get("walk_forward_selected_mean_R")
+    base_010 = at_010.get("baseline_mean_R")
+    mean_015 = at_015.get("walk_forward_selected_mean_R")
+    base_015 = at_015.get("baseline_mean_R")
+    pf_010 = at_010.get("walk_forward_selected_profit_factor")
+    base_pf_010 = at_010.get("baseline_profit_factor")
+    pf_015 = at_015.get("walk_forward_selected_profit_factor")
+    base_pf_015 = at_015.get("baseline_profit_factor")
+    positive_folds = at_010.get("positive_oos_folds_pct")
+    passes_oos_gates = (
+        selected_n >= 60
+        and mean_010 is not None and base_010 is not None and mean_010 > 0
+        and mean_010 >= base_010 + 0.05
+        and mean_015 is not None and base_015 is not None and mean_015 > 0
+        and mean_015 >= base_015 + 0.05
+        and pf_010 is not None and base_pf_010 is not None and pf_010 > base_pf_010
+        and pf_015 is not None and base_pf_015 is not None and pf_015 > base_pf_015
+        and positive_folds is not None and positive_folds >= 60
+    )
+    filter_decision = (
+        "CANDIDATE_FOR_FURTHER_PAPER_VALIDATION"
+        if passes_oos_gates else "NO_FILTER_PASSES_OOS_GATES_KEEP_BASELINE"
+    )
     report = {
         "status": "completed",
+        "filter_decision": filter_decision,
+        "decision_gates": {
+            "minimum_selected_oos_trades": 60,
+            "minimum_mean_R_improvement_at_0_10R_and_0_15R_cost": 0.05,
+            "selected_mean_must_remain_positive_at_0_10R_and_0_15R_cost": True,
+            "profit_factor_must_improve_at_0_10R_and_0_15R_cost": True,
+            "positive_oos_folds_pct_at_0_10R_cost_minimum": 60,
+        },
         "rows": int(len(data)),
         "first_signal_utc": data.scan_ts.min().isoformat(),
         "last_signal_utc": data.scan_ts.max().isoformat(),
