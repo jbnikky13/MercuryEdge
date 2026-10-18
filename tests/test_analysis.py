@@ -34,7 +34,7 @@ def test_indicators_exist():
 
 
 def test_analysis_returns_valid_result():
-    result = analyze(add_indicators(sample_data(239)))
+    result = analyze(add_indicators(sample_data(250)))
     assert result is not None
     assert result["direction"] in {"BUY", "SELL"}
     assert result["score"] <= 100
