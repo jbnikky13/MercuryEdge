@@ -171,6 +171,19 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
     if direction is None or not np.isfinite(row.ATR) or row.ATR <= 0:
         return None
 
+    # Historical replay found that entries stretched more than 1 ATR from
+    # EMA20 were consistently weaker. Avoid chasing those moves, and require
+    # the medium-term trend to still slope in the signal direction.
+    entry_stretch_atr = abs(float(row.Close) - float(row.EMA20)) / float(row.ATR)
+    ema50_slope = float(row.EMA50) - float(previous.EMA50)
+    if direction is not None:
+        if not np.isfinite(entry_stretch_atr) or entry_stretch_atr > 1.0:
+            return None
+        if direction == "BUY" and ema50_slope <= 0:
+            return None
+        if direction == "SELL" and ema50_slope >= 0:
+            return None
+
     historical_score = historical.score if historical else 0
     score = int(np.clip(score + historical_score, 0, 100))
 
@@ -185,6 +198,8 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "direction": direction, "setup": setup, "trend": trend, "score": score,
         "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop),
         "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR),
+        "entry_stretch_atr": round(float(entry_stretch_atr), 3),
+        "ema50_slope": float(ema50_slope),
         "timestamp": str(df.index[-1]),
         "historical_score": historical_score,
         "historical_confidence": historical.confidence if historical else 0.0,
