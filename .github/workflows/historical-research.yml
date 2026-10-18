@@ -32,6 +32,17 @@ jobs:
         run: python scripts/replay_live_pipeline.py
       - name: Analyze entry-stretch buckets and cost-aware caps (diagnostic only)
         run: python scripts/analyze_entry_stretch.py
+      - name: Select candidate signal filters using purged chronological walk-forward tests
+        env:
+          SIGNAL_FILTER_TRAIN_DAYS: "365"
+          SIGNAL_FILTER_TEST_DAYS: "90"
+          SIGNAL_FILTER_STEP_DAYS: "90"
+          SIGNAL_FILTER_PURGE_HOURS: "24"
+          SIGNAL_FILTER_MIN_TRAIN_TRADES: "30"
+          SIGNAL_FILTER_SELECTION_COST_R: "0.10"
+          SIGNAL_FILTER_MIN_EDGE_IMPROVEMENT_R: "0.03"
+          SIGNAL_FILTER_COSTS_R: "0,0.05,0.10,0.15,0.20"
+        run: python scripts/walk_forward_signal_filters.py
       - name: Audit ex-ante duration candidate coverage and look-ahead boundaries
         run: python scripts/duration_candidate_audit.py
       - name: Replay distinct duration-specific exit geometry variants
@@ -76,7 +87,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mercuryedge-historical-research-${{ github.run_number }}
+          name: mercuryedge-historical-research-\${{ github.run_number }}
           path: research_data/
           if-no-files-found: warn
           retention-days: 90
