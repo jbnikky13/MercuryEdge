@@ -34,7 +34,7 @@ def test_indicators_exist():
 
 
 def test_analysis_returns_valid_result():
-    result = analyze(add_indicators(sample_data()))
+    result = analyze(add_indicators(sample_data(250)))
     assert result is not None
     assert result["direction"] in {"BUY", "SELL"}
     assert result["score"] <= 100
@@ -58,3 +58,33 @@ def test_short_or_invalid_data_is_handled():
     broken = short.drop(columns=["Close"])
     with pytest.raises(ValueError):
         add_indicators(broken)
+
+
+
+def test_overextended_entries_are_rejected():
+    # The final candle is more than 3 ATR from EMA20; the replay found this
+    # chase zone materially weaker than entries near the short-term mean.
+    assert analyze(add_indicators(sample_data(260))) is None
+
+
+
+def test_holding_horizon_requires_strong_mature_analogue_evidence():
+    from mercuryedge.analysis import _historical_holding_period
+    from mercuryedge.historical import HistoricalContext
+
+    base = dict(
+        score=0, confidence=0.4, sample_size=60, day_of_week="Monday", month=1,
+        volatility_regime="NORMAL", trend_regime="BULLISH",
+        avg_1d_return=0.001, avg_3d_return=0.002, avg_5d_return=0.003,
+        win_rate_3d=0.56, win_rate_1d=0.56, win_rate_5d=0.57, note="test",
+    )
+    assert _historical_holding_period(HistoricalContext(**base)) == "INTRADAY_0_24H"
+
+    weak_hit_rate = dict(base, win_rate_1d=0.51, win_rate_3d=0.52, win_rate_5d=0.53)
+    assert _historical_holding_period(HistoricalContext(**weak_hit_rate)) == "NO_HORIZON_EDGE"
+
+    small_sample = dict(base, sample_size=19)
+    assert _historical_holding_period(HistoricalContext(**small_sample)) == "NO_HORIZON_EDGE"
+
+    negative_mean = dict(base, avg_1d_return=-0.001, avg_3d_return=-0.002, avg_5d_return=-0.003)
+    assert _historical_holding_period(HistoricalContext(**negative_mean)) == "NO_HORIZON_EDGE"

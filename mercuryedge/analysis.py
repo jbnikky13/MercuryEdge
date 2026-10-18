@@ -139,6 +139,31 @@ def _walkforward_approved() -> bool:
         return False
 
 
+def _historical_holding_period(historical: HistoricalContext | None) -> str:
+    """Use a conservative horizon label only when analogue evidence is credible.
+
+    Directional close-to-close hit rates are not trade win probabilities. Avoid
+    selecting a horizon from a barely-coin-flip rate or a tiny analogue sample.
+    """
+    if historical is None:
+        return "NO_HORIZON_EDGE"
+    if historical.sample_size < 40 or historical.confidence < 0.2:
+        return "NO_HORIZON_EDGE"
+
+    horizons = (
+        ("INTRADAY_0_24H", historical.win_rate_1d, historical.avg_1d_return),
+        ("SWING_24_72H", historical.win_rate_3d, historical.avg_3d_return),
+        ("POSITION_3_5D", historical.win_rate_5d, historical.avg_5d_return),
+    )
+    for label, hit_rate, mean_return in horizons:
+        if (
+            hit_rate is not None and hit_rate >= 0.55
+            and mean_return is not None and mean_return > 0
+        ):
+            return label
+    return "NO_HORIZON_EDGE"
+
+
 def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> dict | None:
     if len(df) < 220:
         return None
@@ -171,6 +196,19 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
     if direction is None or not np.isfinite(row.ATR) or row.ATR <= 0:
         return None
 
+    # Historical replay found that entries stretched more than 1 ATR from
+    # EMA20 were consistently weaker. Avoid chasing those moves, and require
+    # the medium-term trend to still slope in the signal direction.
+    entry_stretch_atr = abs(float(row.Close) - float(row.EMA20)) / float(row.ATR)
+    ema50_slope = float(row.EMA50) - float(previous.EMA50)
+    if direction is not None:
+        if not np.isfinite(entry_stretch_atr) or entry_stretch_atr > 1.0:
+            return None
+        if direction == "BUY" and ema50_slope <= 0:
+            return None
+        if direction == "SELL" and ema50_slope >= 0:
+            return None
+
     historical_score = historical.score if historical else 0
     score = int(np.clip(score + historical_score, 0, 100))
 
@@ -185,6 +223,8 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "direction": direction, "setup": setup, "trend": trend, "score": score,
         "entry": entry, "tp1": float(tp1), "tp2": float(tp2), "sl": float(stop),
         "rr1": 1.15, "rr2": 2.25, "rsi": float(row.RSI), "atr": float(row.ATR),
+        "entry_stretch_atr": round(float(entry_stretch_atr), 3),
+        "ema50_slope": float(ema50_slope),
         "timestamp": str(df.index[-1]),
         "historical_score": historical_score,
         "historical_confidence": historical.confidence if historical else 0.0,
@@ -194,5 +234,8 @@ def analyze(df: pd.DataFrame, historical: HistoricalContext | None = None) -> di
         "historical_volatility": historical.volatility_regime if historical else None,
         "historical_regime": historical.trend_regime if historical else None,
         "historical_win_rate_3d": historical.win_rate_3d if historical else None,
+        "historical_win_rate_1d": historical.win_rate_1d if historical else None,
+        "historical_win_rate_5d": historical.win_rate_5d if historical else None,
+        "historical_holding_period": _historical_holding_period(historical),
         "historical_note": historical.note if historical else "Historical engine disabled",
     }

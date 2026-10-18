@@ -30,13 +30,30 @@ jobs:
         run: python scripts/research_historical.py
       - name: Replay the scheduled live signal pipeline point-in-time
         run: python scripts/replay_live_pipeline.py
+      - name: Analyze entry-stretch buckets and cost-aware caps (diagnostic only)
+        run: python scripts/analyze_entry_stretch.py
+      - name: Select candidate signal filters using purged chronological walk-forward tests
+        env:
+          SIGNAL_FILTER_TRAIN_DAYS: "365"
+          SIGNAL_FILTER_TEST_DAYS: "90"
+          SIGNAL_FILTER_STEP_DAYS: "90"
+          SIGNAL_FILTER_PURGE_HOURS: "24"
+          SIGNAL_FILTER_MIN_TRAIN_TRADES: "30"
+          SIGNAL_FILTER_SELECTION_COST_R: "0.10"
+          SIGNAL_FILTER_MIN_EDGE_IMPROVEMENT_R: "0.03"
+          SIGNAL_FILTER_COSTS_R: "0,0.05,0.10,0.15,0.20"
+        run: python scripts/walk_forward_signal_filters.py
+      - name: Audit ex-ante duration candidate coverage and look-ahead boundaries
+        run: python scripts/duration_candidate_audit.py
+      - name: Replay distinct duration-specific exit geometry variants
+        run: python scripts/duration_variant_replay.py
       - name: Analyze selected pipeline outcomes and cost sensitivity
         run: python scripts/analyze_live_pipeline.py
       - name: Discover recurring calendar and cross-market patterns
         run: python scripts/discover_recurring_patterns.py
       - name: Analyze non-overlapping trades and cost sensitivity
         run: python scripts/analyze_independent_research.py
-      - name: Validate selector with chronological walk-forward tests
+      - name: Validate 24-hour selector with chronological walk-forward tests
         env:
           WALK_FORWARD_TRAIN_DAYS: "365"
           WALK_FORWARD_TEST_DAYS: "90"
@@ -45,8 +62,27 @@ jobs:
           WALK_FORWARD_MIN_TRAIN_TRADES: "30"
           WALK_FORWARD_SELECTION_COST_R: "0.05"
           WALK_FORWARD_MIN_TRAIN_EDGE_R: "0.02"
-          WALK_FORWARD_COSTS_R: "0,0.05,0.10"
+          WALK_FORWARD_COSTS_R: "0,0.05,0.10,0.15,0.20"
         run: python scripts/walk_forward_validation.py
+      - name: Validate duration-aware selector on matured five-day outcomes
+        env:
+          DURATION_WF_TRAIN_DAYS: "365"
+          DURATION_WF_TEST_DAYS: "90"
+          DURATION_WF_STEP_DAYS: "90"
+          DURATION_WF_HORIZON_HOURS: "120"
+          DURATION_WF_MIN_TRAIN_TRADES: "8"
+          DURATION_WF_SELECTION_COST_R: "0.05"
+          DURATION_WF_MIN_TRAIN_EDGE_R: "0.02"
+          DURATION_WF_COSTS_R: "0,0.05,0.10,0.15,0.20"
+        run: python scripts/walk_forward_duration_validation.py
+      - name: Stress-test duration selector thresholds
+        env:
+          DURATION_ROBUST_MIN_COUNTS: "8,12,16,20"
+          DURATION_ROBUST_MIN_EDGES_R: "0.02,0.05,0.10"
+          DURATION_ROBUST_COST_R: "0.05"
+        run: python scripts/duration_selector_robustness.py
+      - name: Analyze out-of-sample market breakdown and cost stress
+        run: python scripts/duration_oos_diagnostics.py
       - name: Upload historical research artifact
         if: always()
         uses: actions/upload-artifact@v4

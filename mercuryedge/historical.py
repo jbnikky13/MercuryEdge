@@ -20,6 +20,8 @@ class HistoricalContext:
     avg_3d_return: Optional[float]
     avg_5d_return: Optional[float]
     win_rate_3d: Optional[float]
+    win_rate_1d: Optional[float]
+    win_rate_5d: Optional[float]
     note: str
 
 
@@ -63,7 +65,7 @@ def _safe_mean(series: pd.Series) -> Optional[float]:
 def _empty_context(ts: pd.Timestamp, note: str) -> HistoricalContext:
     return HistoricalContext(
         0, 0.0, 0, ts.day_name(), ts.month, "UNKNOWN", "UNKNOWN",
-        None, None, None, None, note,
+        None, None, None, None, None, None, note,
     )
 
 
@@ -102,9 +104,10 @@ def build_context(
         return _empty_context(ts, "No prior observations")
     latest = prior_features.iloc[-1]
 
-    # Outcomes need three complete daily bars to mature. The cutoff also
-    # prevents historical forward labels from crossing into the query time.
-    eligible = data[data.index.normalize() + pd.Timedelta(days=3) < query_day].dropna(
+    # All horizons used below must be fully matured before the query. In
+    # particular, never use a 5-day forward label while it still overlaps the
+    # query timestamp; that would leak future information into live scoring.
+    eligible = data[data.index.normalize() + pd.Timedelta(days=5) < query_day].dropna(
         subset=["forward_1d", "forward_3d", "forward_5d", "vol_20", "vol_median"]
     )
     if eligible.empty:
@@ -140,6 +143,8 @@ def build_context(
     signed_3d = sample["forward_3d"] * sign
     signed_5d = sample["forward_5d"] * sign
     win_rate = float((signed_3d > 0).mean())
+    win_rate_1d = float((signed_1d > 0).mean())
+    win_rate_5d = float((signed_5d > 0).mean())
     mean_3d = float(signed_3d.mean())
 
     # Blend hit-rate edge and normalized forward-return edge, then shrink
@@ -170,5 +175,7 @@ def build_context(
         avg_3d_return=mean_3d,
         avg_5d_return=_safe_mean(signed_5d),
         win_rate_3d=win_rate,
+        win_rate_1d=win_rate_1d,
+        win_rate_5d=win_rate_5d,
         note=note,
     )

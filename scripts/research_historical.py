@@ -37,8 +37,18 @@ def _current_rule_signals(frame: pd.DataFrame) -> pd.DataFrame:
     strong_bear = (d["EMA20"] < d["EMA50"]) & (d["EMA50"] < d["EMA200"]) & (d["Close"] < d["EMA20"])
     bullish = strong_bull | (d["Close"] > d["EMA50"])
     bearish = strong_bear | (d["Close"] < d["EMA50"])
-    buy = bullish & d["RSI"].between(50, 72) & (d["MACD"] > d["MACD_SIGNAL"])
-    sell = bearish & d["RSI"].between(28, 50) & (d["MACD"] < d["MACD_SIGNAL"])
+    # Keep the historical core replay aligned with the live analyzer's
+    # anti-chase and directional EMA50-slope gates.
+    stretch_atr = (d["Close"] - d["EMA20"]).abs() / d["ATR"].replace(0, np.nan)
+    ema50_slope = d["EMA50"].diff()
+    buy = (
+        bullish & d["RSI"].between(50, 72) & (d["MACD"] > d["MACD_SIGNAL"])
+        & (stretch_atr <= 1.0) & (ema50_slope > 0)
+    )
+    sell = (
+        bearish & d["RSI"].between(28, 50) & (d["MACD"] < d["MACD_SIGNAL"])
+        & (stretch_atr <= 1.0) & (ema50_slope < 0)
+    )
     breakout = buy & (d["Close"] > d["ROLL_HIGH"]) & (prev["Close"] <= prev["ROLL_HIGH"])
     breakdown = sell & (d["Close"] < d["ROLL_LOW"]) & (prev["Close"] >= prev["ROLL_LOW"])
     direction = pd.Series("", index=d.index, dtype="object")
