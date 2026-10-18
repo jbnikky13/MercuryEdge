@@ -34,7 +34,7 @@ def test_indicators_exist():
 
 
 def test_analysis_returns_valid_result():
-    result = analyze(add_indicators(sample_data()))
+    result = analyze(add_indicators(sample_data(239)))
     assert result is not None
     assert result["direction"] in {"BUY", "SELL"}
     assert result["score"] <= 100
@@ -58,3 +58,10 @@ def test_short_or_invalid_data_is_handled():
     broken = short.drop(columns=["Close"])
     with pytest.raises(ValueError):
         add_indicators(broken)
+
+
+
+def test_overextended_entries_are_rejected():
+    # The final candle is more than 3 ATR from EMA20; the replay found this
+    # chase zone materially weaker than entries near the short-term mean.
+    assert analyze(add_indicators(sample_data(260))) is None
