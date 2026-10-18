@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from signal_filters import check_signal, filter_batch
-from market_data import resolve_ticker
+from market_data import resolve_ticker, get_live_quote
 from scheduler import BATCHES
 from mercuryedge.config import MARKETS
 from mercuryedge.__main__ import _restrict_to_batch, _signal_slot
@@ -13,7 +13,7 @@ def signal(**overrides):
     item = {
         "symbol": "EURUSD",
         "direction": "BUY",
-        "entry": 1.10,
+        "entry": 1.10,\n        "atr": 0.01,
         "score": 70,
         "hit_rate": 60,
         "analogues": 80,
@@ -120,3 +120,26 @@ def test_invalid_explicit_slot_uses_clock_fallback(monkeypatch):
     from datetime import datetime, timezone
     # 06:35 WAT is 05:35 UTC and falls within the morning window.
     assert _signal_slot(datetime(2026, 10, 12, 5, 35, tzinfo=timezone.utc)) == "morning"
+
+
+
+def test_live_quote_rejects_stale_and_invalid_candles(monkeypatch):
+    import pandas as pd
+    import market_data
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    fresh = pd.DataFrame({"Close": [1.1]}, index=pd.DatetimeIndex([now - timedelta(minutes=5)]))
+    monkeypatch.setattr(market_data, "get_candles", lambda *args, **kwargs: fresh)
+    quote = get_live_quote("EURUSD")
+    assert quote is not None
+    assert quote["price"] == 1.1
+    assert quote["age_minutes"] <= 15
+
+    stale = pd.DataFrame({"Close": [1.1]}, index=pd.DatetimeIndex([now - timedelta(minutes=30)]))
+    monkeypatch.setattr(market_data, "get_candles", lambda *args, **kwargs: stale)
+    assert get_live_quote("EURUSD") is None
+
+    invalid = pd.DataFrame({"Close": [0]}, index=pd.DatetimeIndex([now - timedelta(minutes=5)]))
+    monkeypatch.setattr(market_data, "get_candles", lambda *args, **kwargs: invalid)
+    assert get_live_quote("EURUSD") is None
