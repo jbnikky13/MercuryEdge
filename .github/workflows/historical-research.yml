@@ -30,6 +30,8 @@ jobs:
         run: python scripts/research_historical.py
       - name: Replay the scheduled live signal pipeline point-in-time
         run: python scripts/replay_live_pipeline.py
+      - name: Analyze entry-stretch buckets and cost-aware caps (diagnostic only)
+        run: python scripts/analyze_entry_stretch.py
       - name: Audit ex-ante duration candidate coverage and look-ahead boundaries
         run: python scripts/duration_candidate_audit.py
       - name: Replay distinct duration-specific exit geometry variants
