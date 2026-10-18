@@ -24,8 +24,7 @@ SYMBOLS = {
 }
 # Reverse lookup also allows MercuryEdge to pass its configured Yahoo ticker.
 _TICKER_TO_SYMBOL = {ticker: symbol for symbol, ticker in SYMBOLS.items()}
-MAX_AGE_MIN = 90
-MAX_ENTRY_DEVIATION = 0.02
+MAX_AGE_MIN = 15  # A 5-minute candle older than this is not a usable current quote.
 
 
 def _yf():
@@ -87,22 +86,45 @@ def get_history(symbol_or_ticker, period="6mo", interval="1h"):
     return _normalize(raw)
 
 
-def get_live_price(symbol):
-    """Latest close only when the most recent 5m candle is not stale."""
+def get_live_quote(symbol):
+    """Return a fresh 5-minute close with its UTC timestamp, or None.
+
+    Yahoo candles are a sanity-check feed, not executable broker quotes.
+    """
     now = datetime.now(timezone.utc)
     df = get_candles(symbol, now - timedelta(hours=6), now, interval="5m")
     if df is None or df.empty:
         return None
-    age_min = (now - df.index[-1]).total_seconds() / 60
-    if age_min > MAX_AGE_MIN:
+    stamp = df.index[-1]
+    if stamp.tzinfo is None:
+        stamp = stamp.tz_localize("UTC")
+    else:
+        stamp = stamp.tz_convert("UTC")
+    age_min = (now - stamp.to_pydatetime()).total_seconds() / 60
+    if age_min < -2 or age_min > MAX_AGE_MIN:
         return None
-    return float(df["Close"].iloc[-1])
+    price = float(df["Close"].iloc[-1])
+    if not pd.notna(price) or price <= 0:
+        return None
+    return {"price": price, "timestamp": stamp.isoformat(), "age_minutes": max(0.0, age_min)}
 
 
-def feed_agrees(symbol, entry, live=None):
+def get_live_price(symbol):
+    """Backward-compatible price-only wrapper; rejects stale quotes."""
+    quote = get_live_quote(symbol)
+    return quote["price"] if quote else None
+
+
+def feed_agrees(symbol, entry, live=None, atr=None):
+    """Compare entry to the latest quote using ATR-scaled tolerance, not a fixed 2%."""
     live = get_live_price(symbol) if live is None else live
     try:
-        return live is not None and abs(float(live) - float(entry)) / float(live) <= MAX_ENTRY_DEVIATION
+        price = float(live)
+        entry = float(entry)
+        atr_value = float(atr)
+        if not all(pd.notna(v) for v in (price, entry, atr_value)) or min(price, entry, atr_value) <= 0:
+            return False
+        return abs(price - entry) <= 0.35 * atr_value
     except (TypeError, ValueError, ZeroDivisionError):
         return False
 
