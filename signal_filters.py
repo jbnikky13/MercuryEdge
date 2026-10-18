@@ -79,7 +79,7 @@ def check_signal(sig, price_lookup=None):
                 if not stamp:
                     return False, "quote missing timestamp"
             else:
-                live = float(quote)
+                return False, "quote missing freshness metadata"
             if not np_isfinite_positive(live):
                 return False, "invalid live price"
             atr_value = sig.get("atr")
