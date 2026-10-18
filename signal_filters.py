@@ -9,13 +9,14 @@ MIN_SCORE = 65
 MIN_HIT_RATE = 50.0
 MIN_ANALOGUES = 40
 MIN_CONFIRMATION = 0
-MAX_FEED_DEVIATION = 0.02
+MAX_ENTRY_DEVIATION_ATR = 0.35
+MAX_QUOTE_AGE_MINUTES = 15
 MAX_PER_SYMBOL_PER_DAY = 1
 BLOCK_RANGE_REGIME = False
 PAUSED = {("VIX", "SELL"), ("DXY", "BUY")}
 
 
-def check_signal(sig, price_lookup=None):
+def np_isfinite_positive(value):\n    return math.isfinite(value) and value > 0\n\n\ndef check_signal(sig, price_lookup=None):
     """Return (accepted, reason). Missing/invalid evidence fails closed."""
     symbol = str(sig.get("symbol", "")).upper()
     direction = str(sig.get("direction", "")).upper()
@@ -58,11 +59,37 @@ def check_signal(sig, price_lookup=None):
 
     if price_lookup is not None:
         try:
-            live = price_lookup(symbol)
-            if live is None or float(live) <= 0:
-                return False, "no live price (data feed missing)"
-            if abs(float(live) - entry) / float(live) > MAX_FEED_DEVIATION:
-                return False, f"feed {live} vs entry {entry}"
+            quote = price_lookup(symbol)
+            if quote is None:
+                return False, "price feed unavailable or stale"
+            # Production quote providers return price + timestamp + age. A bare
+            # scalar remains supported for simple callers/tests, but cannot
+            # establish freshness; production get_live_quote supplies metadata.
+            if isinstance(quote, dict):
+                live = float(quote.get("price"))
+                age = float(quote.get("age_minutes"))
+                if not (age >= 0 and age <= MAX_QUOTE_AGE_MINUTES):
+                    return False, f"stale quote age={age:g}m (max {MAX_QUOTE_AGE_MINUTES}m)"
+                stamp = quote.get("timestamp")
+                if not stamp:
+                    return False, "quote missing timestamp"
+            else:
+                live = float(quote)
+            if not np_isfinite_positive(live):
+                return False, "invalid live price"
+            atr_value = sig.get("atr")
+            try:
+                atr_value = float(atr_value)
+            except (TypeError, ValueError, OverflowError):
+                return False, "missing or invalid ATR for entry-distance check"
+            if not np_isfinite_positive(atr_value):
+                return False, "invalid ATR for entry-distance check"
+            deviation_atr = abs(live - entry) / atr_value
+            if deviation_atr > MAX_ENTRY_DEVIATION_ATR:
+                return False, (
+                    f"price-entry gap {deviation_atr:.2f} ATR > "
+                    f"{MAX_ENTRY_DEVIATION_ATR:.2f} ATR (quote={live:g}, entry={entry:g})"
+                )
         except Exception as exc:
             return False, f"price feed error: {exc}"
     return True, ""
