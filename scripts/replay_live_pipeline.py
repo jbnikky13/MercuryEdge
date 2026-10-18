@@ -343,6 +343,17 @@ def replay(root: Path = ROOT) -> tuple[pd.DataFrame, dict]:
                 "score": int(item["score"]),
                 "setup": setup.get("setup"),
                 "entry": float(setup["entry"]),
+                # Point-in-time stretch: only completed hourly data available at scan time.
+                "entry_stretch_atr": (
+                    float(abs(float(setup["entry"]) - float(item["_frame"]["EMA20"].iloc[-1]))
+                          / float(item["_frame"]["ATR"].iloc[-1]))
+                    if "EMA20" in item["_frame"].columns
+                    and "ATR" in item["_frame"].columns
+                    and pd.notna(item["_frame"]["EMA20"].iloc[-1])
+                    and pd.notna(item["_frame"]["ATR"].iloc[-1])
+                    and float(item["_frame"]["ATR"].iloc[-1]) > 0
+                    else None
+                ),
                 "sl": float(setup["sl"]),
                 "tp1": float(setup["tp1"]),
                 "tp2": float(setup["tp2"]),
