@@ -28,7 +28,12 @@ def check_signal(sig, price_lookup=None):
     if (symbol, direction) in PAUSED:
         return False, "paused (poor audit record)"
 
-    for key in ("score", "hit_rate", "analogues", "entry"):
+    # Historical evidence is a ranking aid, not a mandatory setup prerequisite.
+    # Only enforce the historical hit-rate floor when the rate is present and
+    # backed by the minimum analogue sample. Missing/insufficient history is
+    # reported as unverified by the caller, while technical and safety gates
+    # continue to apply.
+    for key in ("score", "entry"):
         value = sig.get(key)
         if value is None:
             return False, f"missing required field: {key}"
@@ -40,17 +45,26 @@ def check_signal(sig, price_lookup=None):
 
     try:
         score = float(sig["score"])
-        hit_rate = float(sig["hit_rate"])
-        analogues = int(float(sig["analogues"]))
         entry = float(sig["entry"])
     except (TypeError, ValueError, OverflowError):
-        return False, "invalid score, hit rate, analogue count, or entry"
+        return False, "invalid score or entry"
+    if not math.isfinite(score) or not math.isfinite(entry):
+        return False, "invalid score or entry"
     if score < MIN_SCORE:
         return False, f"score {score:g} < {MIN_SCORE}"
-    if hit_rate < MIN_HIT_RATE:
-        return False, f"hit rate {hit_rate:g}% < {MIN_HIT_RATE}%"
-    if analogues < MIN_ANALOGUES:
-        return False, f"only {analogues} analogues"
+
+    hit_rate = sig.get("hit_rate")
+    analogues = sig.get("analogues")
+    if hit_rate is not None and analogues is not None:
+        try:
+            hit_rate = float(hit_rate)
+            analogues = int(float(analogues))
+            if not math.isfinite(hit_rate) or analogues < 0:
+                return False, "invalid historical evidence"
+        except (TypeError, ValueError, OverflowError):
+            return False, "invalid historical evidence"
+        if analogues >= MIN_ANALOGUES and hit_rate < MIN_HIT_RATE:
+            return False, f"hit rate {hit_rate:g}% < {MIN_HIT_RATE}% with {analogues} analogues"
 
     confirmation = sig.get("confirmation", 0)
     try:
