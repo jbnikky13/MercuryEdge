@@ -148,3 +148,21 @@ def test_live_quote_rejects_stale_and_invalid_candles(monkeypatch):
     invalid = pd.DataFrame({"Close": [0]}, index=pd.DatetimeIndex([now - timedelta(minutes=5)]))
     monkeypatch.setattr(market_data, "get_candles", lambda *args, **kwargs: invalid)
     assert get_live_quote("EURUSD") is None
+
+
+def test_missing_historical_evidence_does_not_block_valid_setup():
+    ok, reason = check_signal(signal(hit_rate=None, analogues=None))
+    assert ok
+    assert reason == ""
+
+
+def test_insufficient_historical_sample_does_not_block_valid_setup():
+    ok, reason = check_signal(signal(hit_rate=20, analogues=12))
+    assert ok
+    assert reason == ""
+
+
+def test_well_sampled_low_hit_rate_still_fails_quality_gate():
+    ok, reason = check_signal(signal(hit_rate=49, analogues=80))
+    assert not ok
+    assert "hit rate" in reason
