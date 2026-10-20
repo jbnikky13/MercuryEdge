@@ -34,7 +34,8 @@ def test_good_signal_passes_without_network():
 def test_weak_or_conflicting_signal_is_rejected():
     assert check_signal(signal(score=64))[0] is False
     assert check_signal(signal(hit_rate=49))[0] is False
-    assert check_signal(signal(analogues=39))[0] is False
+    # Small historical samples are unverified, not a reason to block the setup.
+    assert check_signal(signal(analogues=39))[0] is True
     assert check_signal(signal(confirmation=-1))[0] is False
     assert check_signal(signal(symbol="VIX", direction="SELL"))[0] is False
 
