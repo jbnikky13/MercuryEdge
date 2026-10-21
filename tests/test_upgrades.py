@@ -76,3 +76,29 @@ def test_exit_and_walkforward():
     rows = [{"ts": i, "score": rng.uniform(50, 100), "R": 1.15 if rng.random() < 0.5 else -1}
             for i in range(100)]
     assert walk_forward(pd.DataFrame(rows), "score", [55, 60, 65])["status"] == "ok"
+
+
+
+def test_moderate_adx_can_pass_when_htf_confirms(monkeypatch):
+    import mercuryedge.upgrades as upgrades
+
+    frame = _frame()
+    monkeypatch.setattr(upgrades, "adx", lambda df: pd.Series([18.0] * len(df), index=df.index))
+    monkeypatch.setattr(upgrades, "htf_trend", lambda df: "BUY")
+
+    accepted, info = upgrades.passes_regime(frame, "BUY", min_adx=20, require_htf=True)
+    assert accepted
+    assert info["adx"] == 18.0
+    assert info["htf_agree"] is True
+
+
+def test_moderate_adx_without_htf_confirmation_still_fails(monkeypatch):
+    import mercuryedge.upgrades as upgrades
+
+    frame = _frame()
+    monkeypatch.setattr(upgrades, "adx", lambda df: pd.Series([18.0] * len(df), index=df.index))
+    monkeypatch.setattr(upgrades, "htf_trend", lambda df: "SELL")
+
+    accepted, info = upgrades.passes_regime(frame, "BUY", min_adx=20, require_htf=True)
+    assert not accepted
+    assert any("without 4h trend confirmation" in reason for reason in info["reasons"])
