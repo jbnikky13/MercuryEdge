@@ -32,7 +32,8 @@ def test_good_signal_passes_without_network():
 
 
 def test_weak_or_conflicting_signal_is_rejected():
-    assert check_signal(signal(score=64))[0] is False
+    assert check_signal(signal(score=54))[0] is False
+    assert check_signal(signal(score=55))[0] is True
     assert check_signal(signal(hit_rate=49))[0] is False
     # Small historical samples are unverified, not a reason to block the setup.
     assert check_signal(signal(analogues=39))[0] is True
@@ -152,7 +153,9 @@ def test_live_quote_rejects_stale_and_invalid_candles(monkeypatch):
 
 
 def test_missing_historical_evidence_does_not_block_valid_setup():
-    ok, reason = check_signal(signal(hit_rate=None, analogues=None))
+    # A live candidate score observed after the previous merge must not be
+    # rejected solely because it is below the old 65-point floor.
+    ok, reason = check_signal(signal(score=62, hit_rate=None, analogues=None))
     assert ok
     assert reason == ""
 
