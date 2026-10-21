@@ -285,7 +285,8 @@ def main() -> None:
     print(f"Signal window: {slot}")
     print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
-    print(f"Setups found: {len(candidates)}")
+    print(f"Technical candidates found: {len(candidates)}")
+    print(f"Audit gate passed: {len(kept)}/{len(filter_candidates)}")
     print(f"Regime/exposure selected: {len(selected_candidates)}/{MAX_SETUPS}")
     print(f"Existing open exposure: {len(open_signals)}")
     print(f"Guardrails: ADX>={MIN_ADX:g}, 4H={'ON' if REQUIRE_HTF_TREND else 'OFF'}, currency cap={MAX_CURRENCY_EXPOSURE:g}")
@@ -302,7 +303,10 @@ def main() -> None:
         )
 
     if not selected_candidates:
-        print("No qualifying setups after regime/exposure filtering.")
+        if not eligible_candidates:
+            print("No candidates passed the audit score/feed/duplicate gate; regime/exposure selection had nothing to evaluate.")
+        else:
+            print("No qualifying setups after regime/exposure filtering.")
         send_telegram(
             "🧠 MERCURYEDGE\n"
             f"{slot.upper()} SIGNAL • NO QUALIFYING SETUPS\n"
