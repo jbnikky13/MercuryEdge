@@ -6,7 +6,7 @@ Run: python signal_filters.py audit-results.csv
 import sys
 import math
 
-MIN_SCORE = 65
+MIN_SCORE = 55
 MIN_HIT_RATE = 50.0
 MIN_ANALOGUES = 40
 MIN_CONFIRMATION = 0
