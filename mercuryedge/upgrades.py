@@ -104,14 +104,24 @@ def passes_regime(
     adx_now = float(adx_series.iloc[-1])
     htf = htf_trend(df_1h)
     reasons = []
-    if not np.isfinite(adx_now) or adx_now < min_adx:
-        reasons.append(f"ADX {adx_now:.1f} < {min_adx:g}")
-    if require_htf and htf != side:
+    # A modest ADX shortfall is not an automatic rejection when the higher-timeframe
+    # trend independently agrees. Keep a hard floor to avoid treating flat markets
+    # as trends; stronger ADX still requires HTF alignment when that guard is enabled.
+    hard_adx_floor = min(15.0, min_adx)
+    adx_valid = np.isfinite(adx_now) and adx_now >= hard_adx_floor
+    htf_agree = htf == side
+    if not adx_valid:
+        reasons.append(f"ADX {adx_now:.1f} < hard floor {hard_adx_floor:g}")
+    elif adx_now < min_adx and not htf_agree:
+        reasons.append(
+            f"ADX {adx_now:.1f} < {min_adx:g} without 4h trend confirmation"
+        )
+    if require_htf and not htf_agree:
         reasons.append(f"4h trend {htf or 'unknown'} vs {side}")
     return not reasons, {
         "adx": adx_now,
         "htf_trend": htf,
-        "htf_agree": htf == side,
+        "htf_agree": htf_agree,
         "reasons": reasons,
     }
 
