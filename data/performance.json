@@ -13,28 +13,28 @@
         "win_rate": 0.4375
       },
       "LOW": {
-        "average_r": -0.1118,
+        "average_r": -0.0927,
         "median_r": -1.0,
-        "resolved": 123,
-        "signals": 123,
+        "resolved": 124,
+        "signals": 124,
         "sl": 86,
         "tp1": 10,
-        "tp2": 27,
+        "tp2": 28,
         "unresolved": 0,
-        "win_rate": 0.3008
+        "win_rate": 0.3065
       }
     },
     "category": {
       "commodity": {
-        "average_r": -0.3578,
+        "average_r": -0.2788,
         "median_r": -1.0,
-        "resolved": 32,
-        "signals": 32,
+        "resolved": 33,
+        "signals": 33,
         "sl": 25,
         "tp1": 2,
-        "tp2": 5,
+        "tp2": 6,
         "unresolved": 0,
-        "win_rate": 0.2188
+        "win_rate": 0.2424
       },
       "forex": {
         "average_r": 0.2155,
@@ -61,15 +61,15 @@
     },
     "crossmarket": {
       "NEUTRAL": {
-        "average_r": -0.1043,
+        "average_r": -0.086,
         "median_r": -1.0,
-        "resolved": 128,
-        "signals": 128,
+        "resolved": 129,
+        "signals": 129,
         "sl": 89,
         "tp1": 11,
-        "tp2": 28,
+        "tp2": 29,
         "unresolved": 0,
-        "win_rate": 0.3047
+        "win_rate": 0.3101
       },
       "POSITIVE": {
         "average_r": 0.363,
@@ -85,15 +85,15 @@
     },
     "direction": {
       "BUY": {
-        "average_r": -0.0178,
+        "average_r": 0.0117,
         "median_r": -1.0,
-        "resolved": 76,
-        "signals": 76,
+        "resolved": 77,
+        "signals": 77,
         "sl": 51,
         "tp1": 6,
-        "tp2": 19,
+        "tp2": 20,
         "unresolved": 0,
-        "win_rate": 0.3289
+        "win_rate": 0.3377
       },
       "SELL": {
         "average_r": -0.0278,
@@ -120,15 +120,15 @@
         "win_rate": 0.0
       },
       "NEUTRAL": {
-        "average_r": -0.1345,
+        "average_r": -0.1109,
         "median_r": -1.0,
-        "resolved": 100,
-        "signals": 100,
+        "resolved": 101,
+        "signals": 101,
         "sl": 71,
         "tp1": 7,
-        "tp2": 22,
+        "tp2": 23,
         "unresolved": 0,
-        "win_rate": 0.29
+        "win_rate": 0.297
       },
       "POSITIVE": {
         "average_r": 0.2019,
@@ -144,15 +144,15 @@
     }
   },
   "overall": {
-    "average_r": -0.0229,
+    "average_r": -0.0083,
     "median_r": -1.0,
-    "resolved": 155,
-    "signals": 155,
+    "resolved": 156,
+    "signals": 156,
     "sl": 104,
     "tp1": 13,
-    "tp2": 38,
+    "tp2": 39,
     "unresolved": 0,
-    "win_rate": 0.329
+    "win_rate": 0.3333
   },
   "version": 1
 }
