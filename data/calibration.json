@@ -1,17 +1,17 @@
 {
-  "baseline_win_rate": 0.3438,
+  "baseline_win_rate": 0.3476,
   "factors": {
     "agreement": {
       "HIGH": {
-        "baseline_win_rate": 0.3438,
-        "edge": 0.0938,
+        "baseline_win_rate": 0.3476,
+        "edge": 0.0969,
         "modifier": 1,
-        "samples": 32,
-        "win_rate": 0.4375
+        "samples": 36,
+        "win_rate": 0.4444
       },
       "LOW": {
-        "baseline_win_rate": 0.3438,
-        "edge": -0.0234,
+        "baseline_win_rate": 0.3476,
+        "edge": -0.0272,
         "modifier": 0,
         "samples": 128,
         "win_rate": 0.3203
@@ -19,30 +19,30 @@
     },
     "crossmarket": {
       "NEUTRAL": {
-        "baseline_win_rate": 0.3438,
-        "edge": -0.0204,
+        "baseline_win_rate": 0.3476,
+        "edge": -0.0216,
         "modifier": 0,
-        "samples": 133,
-        "win_rate": 0.3233
+        "samples": 135,
+        "win_rate": 0.3259
       }
     },
     "historical": {
       "NEUTRAL": {
-        "baseline_win_rate": 0.3438,
-        "edge": -0.0295,
+        "baseline_win_rate": 0.3476,
+        "edge": -0.0265,
         "modifier": 0,
-        "samples": 105,
-        "win_rate": 0.3143
+        "samples": 109,
+        "win_rate": 0.3211
       },
       "POSITIVE": {
-        "baseline_win_rate": 0.3438,
-        "edge": 0.0637,
+        "baseline_win_rate": 0.3476,
+        "edge": 0.0598,
         "modifier": 1,
         "samples": 54,
         "win_rate": 0.4074
       }
     }
   },
-  "samples": 160,
+  "samples": 164,
   "version": 2
 }
