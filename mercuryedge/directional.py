@@ -157,16 +157,54 @@ def directional_outcome_profile(
     return report
 
 
-def load_matured_outcomes(path: Path = OUTCOMES_PATH) -> list[dict]:
-    if not path.exists():
-        return []
+def load_matured_outcomes(
+    path: Path = OUTCOMES_PATH,
+    audit_csv: Path = Path("audit-results.csv"),
+) -> list[dict]:
+    """Load resolver outcomes plus the supplied historical audit snapshot.
+
+    Deduplicate on symbol/direction/timestamp where possible. CSV rows marked
+    mixed, unresolved, or data-mismatch remain present for traceability but are
+    excluded by directional_outcome_profile from binary win-rate estimation.
+    """
     rows = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    seen = {
+        (
+            str(row.get("symbol", row.get("market", ""))).upper(),
+            str(row.get("direction", "")).upper(),
+            str(row.get("signal_time", row.get("ts_utc", ""))),
+        )
+        for row in rows
+    }
+    if audit_csv.exists():
+        try:
+            audit = pd.read_csv(audit_csv)
+            for record in audit.to_dict("records"):
+                key = (
+                    str(record.get("symbol", "")).upper(),
+                    str(record.get("direction", "")).upper(),
+                    str(record.get("signal_time", record.get("ts_utc", ""))),
+                )
+                if key in seen:
+                    continue
+                rows.append({
+                    "symbol": record.get("symbol"),
+                    "direction": record.get("direction"),
+                    "status": record.get("outcome"),
+                    "signal_time": record.get("ts_utc"),
+                    "source": "audit-results.csv",
+                })
+                seen.add(key)
+        except (OSError, ValueError, pd.errors.ParserError):
+            pass
     return rows
 
 
