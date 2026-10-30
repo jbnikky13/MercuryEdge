@@ -17,6 +17,7 @@ from .config import (
     SIGNAL_HORIZON_HOURS,
 )
 from .crossmarket import build_context as build_crossmarket_context
+from .directional import assess_direction
 from .data import load_historical, load_market
 from .historical import build_context
 from .journal import read_journal, record_signal
@@ -153,6 +154,18 @@ def main() -> None:
 
         result = analyze(enriched, context)
         if not result:
+            continue
+
+        # Hard-fail malformed direction/SL/TP geometry. M/W and matured
+        # per-direction outcomes remain advisory pending OOS validation.
+        directional = assess_direction(market.name, result, df)
+        result.update(directional)
+        if not directional["direction_integrity_ok"]:
+            logging.error(
+                "DIRECTIONAL INTEGRITY REJECTED %s %s: %s",
+                market.name, result.get("direction"),
+                directional["direction_integrity_reason"],
+            )
             continue
 
         crossmarket = build_crossmarket_context(

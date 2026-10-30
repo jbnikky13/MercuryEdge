@@ -1,0 +1,34 @@
+name: Research EURCHF M5 candles
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/research-eurchf-m5.yml"
+      - "docs/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Download Dukascopy EURCHF M5 BID and ASK
+        run: |
+          npx --yes dukascopy-node -i eurchf -from 2026-10-29 -to 2026-10-31 -t m5 -p bid -f csv -dir ./research-data -r 3
+          npx --yes dukascopy-node -i eurchf -from 2026-10-29 -to 2026-10-31 -t m5 -p ask -f csv -dir ./research-data -r 3
+      - name: Verify candle files exist
+        run: |
+          find research-data -type f -name '*.csv' -print
+          test "$(find research-data -type f -name '*.csv' | wc -l)" -ge 2
+      - name: Upload raw candle files
+        uses: actions/upload-artifact@v4
+        with:
+          name: eurchf-m5-dukascopy-2026-10-29-to-30
+          path: research-data/**/*.csv
+          if-no-files-found: error
+          retention-days: 14
