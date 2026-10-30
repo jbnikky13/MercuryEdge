@@ -39,6 +39,16 @@ def test_outcome_profile_is_direction_and_symbol_specific():
     assert report["EURCHF:BUY"]["action"] == "OBSERVE"
 
 
+def test_outcome_profile_prefers_canonical_market_over_provider_ticker():
+    rows = [
+        {"market": "EURCHF", "symbol": "EURCHF=X", "direction": "SELL", "status": "SL"}
+        for _ in range(30)
+    ]
+    report = directional_outcome_profile(rows)
+    assert "EURCHF:SELL" in report
+    assert "EURCHF=X:SELL" not in report
+
+
 def test_mw_detector_never_confirms_on_insufficient_history():
     result = detect_mw_pattern(_frame([1, 2, 1, 2, 1]))
     assert result["confirmed"] is False
