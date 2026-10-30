@@ -156,6 +156,18 @@ def main() -> None:
         if not result:
             continue
 
+        # Hard-fail malformed direction/SL/TP geometry. M/W and matured
+        # per-direction outcomes remain advisory pending OOS validation.
+        directional = assess_direction(market.name, result, df)
+        result.update(directional)
+        if not directional["direction_integrity_ok"]:
+            logging.error(
+                "DIRECTIONAL INTEGRITY REJECTED %s %s: %s",
+                market.name, result.get("direction"),
+                directional["direction_integrity_reason"],
+            )
+            continue
+
         crossmarket = build_crossmarket_context(
             market.name, result["direction"], market_data
         )
