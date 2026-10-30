@@ -17,6 +17,7 @@ from .config import (
     SIGNAL_HORIZON_HOURS,
 )
 from .crossmarket import build_context as build_crossmarket_context
+from .directional import assess_direction
 from .data import load_historical, load_market
 from .historical import build_context
 from .journal import read_journal, record_signal
