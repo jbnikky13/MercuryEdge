@@ -126,7 +126,7 @@ def directional_outcome_profile(
     grouped: dict[tuple[str, str], list[bool]] = defaultdict(list)
     for row in rows:
         status = str(row.get("status", row.get("outcome", ""))).upper()
-        symbol = str(row.get("symbol", row.get("market", ""))).upper()
+        symbol = str(row.get("market") or row.get("symbol", "")).upper()
         direction = str(row.get("direction", "")).upper()
         if not symbol or direction not in {"BUY", "SELL"}:
             continue
@@ -178,7 +178,7 @@ def load_matured_outcomes(
 
     seen = {
         (
-            str(row.get("symbol", row.get("market", ""))).upper(),
+            str(row.get("market") or row.get("symbol", "")).upper(),
             str(row.get("direction", "")).upper(),
             str(row.get("signal_time", row.get("ts_utc", ""))),
         )
