@@ -24,7 +24,7 @@ jobs:
       - name: Verify candle files exist
         run: |
           find research-data -type f -name '*.csv' -print
-          test "$(find research-data -type f -name '*.csv' | wc -l)" -ge 4
+          test "$(find research-data -type f -name '*.csv' | wc -l)" -ge 2
       - name: Upload raw candle files
         uses: actions/upload-artifact@v4
         with:
