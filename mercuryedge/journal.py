@@ -69,6 +69,15 @@ def record_signal(market, setup: dict, news=None) -> None:
         "weekday": setup.get("weekday"),
         "ccy_exposure": setup.get("ccy_exposure"),
         "selection_filter": setup.get("selection_filter", "regime+exposure"),
+        "direction_integrity_ok": setup.get("direction_integrity_ok", True),
+        "direction_integrity_reason": setup.get("direction_integrity_reason"),
+        "mw_pattern": setup.get("mw_pattern", "NONE"),
+        "mw_pattern_bias": setup.get("mw_pattern_bias"),
+        "mw_pattern_confirmed": setup.get("mw_pattern_confirmed", False),
+        "mw_pattern_conflict": setup.get("mw_pattern_conflict", False),
+        "directional_outcome_samples": setup.get("directional_outcome_samples", 0),
+        "directional_outcome_win_rate": setup.get("directional_outcome_win_rate"),
+        "directional_outcome_action": setup.get("directional_outcome_action", "OBSERVE"),
         "status": "OPEN",
     }
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
