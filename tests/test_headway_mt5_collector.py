@@ -1,14 +1,16 @@
 from types import SimpleNamespace
+from datetime import date
+from pathlib import Path
 
 import pytest
 
 from research.headway_mt5_collector import (
     EXPECTED_SERVER,
     FeedError,
+    collect,
     resolve_symbol,
     session_bounds,
 )
-from datetime import date
 
 
 class FakeMT5:
@@ -19,9 +21,10 @@ class FakeMT5:
     TIMEFRAME_H1 = 60
     TIMEFRAME_H4 = 240
 
-    def __init__(self, server="Headway-Demo", trade_mode=0):
+    def __init__(self, server="Headway-Demo", trade_mode=0, symbols=None):
         self.server = server
         self.trade_mode = trade_mode
+        self.symbols = symbols or ["EURUSD", "XAGUSD.m", "XAGUSDpro"]
         self.closed = False
 
     def initialize(self):
@@ -37,7 +40,7 @@ class FakeMT5:
         return SimpleNamespace(server=self.server, trade_mode=self.trade_mode)
 
     def symbols_get(self):
-        return [SimpleNamespace(name="EURUSD"), SimpleNamespace(name="XAGUSD.m"), SimpleNamespace(name="XAGUSDpro")]
+        return [SimpleNamespace(name=name) for name in self.symbols]
 
     def last_error(self):
         return (0, "ok")
@@ -55,16 +58,28 @@ def test_exact_symbol_match_wins():
 
 
 def test_unique_suffix_is_allowed():
+    mt5 = FakeMT5(symbols=["XAGUSD.m"])
+    assert resolve_symbol(mt5, "XAGUSD") == ("XAGUSD.m", "unique_suffix")
+
+
+def test_ambiguous_suffix_is_rejected():
     mt5 = FakeMT5()
     assert resolve_symbol(mt5, "XAGUSD") == (None, "ambiguous:XAGUSD.m,XAGUSDpro")
 
 
-def test_wrong_server_is_not_accepted():
-    assert EXPECTED_SERVER == "headway-demo"
+def test_wrong_server_is_rejected_and_terminal_closed(tmp_path):
     mt5 = FakeMT5(server="Headway-Real")
-    assert mt5.server != "Headway-Demo"
+    with pytest.raises(FeedError, match="Wrong MT5 server"):
+        collect(date(2026, 10, 30), ["EURUSD"], Path(tmp_path), mt5=mt5)
+    assert mt5.closed
 
 
-def test_real_account_mode_is_distinct_from_demo():
+def test_non_demo_account_is_rejected_and_terminal_closed(tmp_path):
     mt5 = FakeMT5(trade_mode=1)
-    assert mt5.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO
+    with pytest.raises(FeedError, match="not marked DEMO"):
+        collect(date(2026, 10, 30), ["EURUSD"], Path(tmp_path), mt5=mt5)
+    assert mt5.closed
+
+
+def test_expected_server_label_is_headway_demo():
+    assert EXPECTED_SERVER == "headway-demo"
