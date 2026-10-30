@@ -1,0 +1,28 @@
+name: Headway MT5 Collector Tests
+
+on:
+  pull_request:
+    paths:
+      - "research/headway_mt5_collector.py"
+      - "tests/test_headway_mt5_collector.py"
+      - ".github/workflows/headway-mt5-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run Headway collector safety tests
+        run: pytest -q tests/test_headway_mt5_collector.py
