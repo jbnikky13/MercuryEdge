@@ -45,6 +45,20 @@ def test_mw_detector_never_confirms_on_insufficient_history():
     assert result["pattern"] == "NONE"
 
 
+def test_confirmed_w_pattern_requires_neckline_breakout():
+    result = detect_mw_pattern(_frame([10, 9, 8, 7, 8, 9, 10, 9, 8, 7.02, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]))
+    assert result["pattern"] == "W"
+    assert result["bias"] == "BUY"
+    assert result["confirmed"] is True
+
+
+def test_confirmed_m_pattern_requires_neckline_breakdown():
+    result = detect_mw_pattern(_frame([10, 11, 12, 13, 12, 11, 10, 11, 12, 12.98, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]))
+    assert result["pattern"] == "M"
+    assert result["bias"] == "SELL"
+    assert result["confirmed"] is True
+
+
 def test_assessment_flags_conflicting_confirmed_pattern_and_bad_levels():
     # The assessment is diagnostic; it never silently flips a trade direction.
     frame = _frame(np.linspace(1.0, 1.2, 120))
@@ -52,4 +66,4 @@ def test_assessment_flags_conflicting_confirmed_pattern_and_bad_levels():
     result = assess_direction("EURCHF", setup, frame, outcomes=[])
     assert result["direction_integrity_ok"] is False
     assert result["directional_learning_advisory"] is True
-    assert result["direction"] if "direction" in result else True
+    assert result["mw_pattern"] in {"NONE", "W", "M"}
