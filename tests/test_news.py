@@ -45,3 +45,12 @@ def test_signal_displays_unavailable_nfp_data_and_usd_exposure():
     assert "USD EXPOSURE. YES" in output
     assert "NFP DATA STATUS. FEED UNAVAILABLE" in output
     assert "No forecast or actual labor figure is inferred" in output
+
+
+
+def test_nfp_score_haircut_is_limited_to_usd_exposure():
+    risk = news.NewsRisk(True, "NFP RISK", "headline")
+    assert news.should_reduce_risk("forex", risk, "EURUSD")
+    assert news.should_reduce_risk("forex", risk, "USDJPY")
+    assert not news.should_reduce_risk("forex", risk, "EURJPY")
+    assert news.should_reduce_risk("commodity", risk, "XAUUSD")
