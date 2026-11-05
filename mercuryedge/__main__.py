@@ -202,7 +202,7 @@ def main() -> None:
             )
         )
 
-        if should_reduce_risk(market.category, news):
+        if should_reduce_risk(market.category, news, market.name):
             result["score"] = max(0, result["score"] - 8)
             result["news_risk"] = news.label
 
