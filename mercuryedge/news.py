@@ -87,8 +87,10 @@ def nfp_risk(now: datetime | None = None) -> NewsRisk:
     )
 
 
-def should_reduce_risk(category: str, risk: NewsRisk) -> bool:
-    """NFP primarily affects USD pairs and USD-sensitive commodities."""
+def should_reduce_risk(category: str, risk: NewsRisk, symbol: str | None = None) -> bool:
+    """Apply the NFP score haircut only to USD-exposed markets."""
     if not risk.high_impact:
         return False
-    return category in {"forex", "commodity"}
+    if category == "forex":
+        return bool(symbol and "USD" in symbol.upper())
+    return category == "commodity"
