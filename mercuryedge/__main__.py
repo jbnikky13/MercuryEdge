@@ -10,6 +10,7 @@ from .analysis import adaptive_modifiers, add_indicators, analyze
 from .calendar import ET, WAT, trading_status
 from .config import (
     MARKETS,
+    LONGBRIDGE_SYMBOLS,
     MAX_CURRENCY_EXPOSURE,
     MAX_SETUPS,
     MIN_ADX,
@@ -26,6 +27,7 @@ from .signal import format_bulletin, send_telegram
 from .upgrades import build_features, select_setups
 from signal_filters import filter_batch
 from market_data import get_live_quote
+from .longbridge_data import fetch_quotes as fetch_longbridge_quotes
 from scheduler import BATCHES
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -111,6 +113,23 @@ def main() -> None:
                 return
 
     late_us_scan = slot in {"afternoon", "evening"} and datetime.now(ET).hour >= 16
+    # Longbridge is supplemental quote context only. It never replaces the
+    # established candle source for FX/commodities and never creates setups.
+    longbridge_quotes = (
+        fetch_longbridge_quotes(list(LONGBRIDGE_SYMBOLS))
+        if LONGBRIDGE_SYMBOLS
+        else []
+    )
+    for quote in longbridge_quotes:
+        logging.info(
+            "LONGBRIDGE QUOTE %s last=%s session=%s status=%s observed=%s",
+            quote.get("symbol"),
+            quote.get("last"),
+            quote.get("trade_session"),
+            quote.get("trade_status"),
+            quote.get("observed_at_utc"),
+        )
+
     news = nfp_risk()
     if news.high_impact:
         logging.info("News risk detected: %s", news.reason)
@@ -297,6 +316,7 @@ def main() -> None:
     print("\nMERCURYEDGE MARKET INTELLIGENCE SCAN")
     print(f"Signal window: {slot}")
     print(f"Markets loaded: {len(market_data)}/{len(MARKETS)}")
+    print(f"Longbridge supplemental quotes: {len(longbridge_quotes)}/{len(LONGBRIDGE_SYMBOLS)}")
     print(f"Historical profiles loaded: {historical_loaded}")
     print(f"Technical candidates found: {len(candidates)}")
     print(f"Audit gate passed: {len(kept)}/{len(filter_candidates)}")

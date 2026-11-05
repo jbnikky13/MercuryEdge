@@ -56,5 +56,14 @@ REQUIRE_HTF_TREND = os.getenv("MERCURY_REQUIRE_HTF_TREND", "true").lower() in {"
 MAX_CURRENCY_EXPOSURE = float(os.getenv("MERCURY_MAX_CURRENCY_EXPOSURE", "1.0"))
 SIGNAL_HORIZON_HOURS = int(os.getenv("MERCURY_SIGNAL_HORIZON_HOURS", "24"))
 
+# Optional Longbridge quote-only enrichment; empty by default.
+LONGBRIDGE_SYMBOLS = tuple(
+    dict.fromkeys(
+        item.strip().upper()
+        for item in os.getenv("MERCURY_LONGBRIDGE_SYMBOLS", "").split(",")
+        if item.strip()
+    )
+)
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
