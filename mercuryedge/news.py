@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import logging
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -15,9 +15,11 @@ class NewsRisk:
     label: str
     reason: str
     event_time: datetime | None = None
+    data_available: bool = True
 
 
-def _parse_rss(url: str) -> list[tuple[str, datetime | None]]:
+def _parse_rss(url: str) -> list[tuple[str, datetime | None]] | None:
+    """Return parsed feed items, or None when the feed could not be verified."""
     try:
         request = urllib.request.Request(url, headers={"User-Agent": "MercuryEdge/1.0"})
         with urllib.request.urlopen(request, timeout=10) as response:
@@ -36,15 +38,17 @@ def _parse_rss(url: str) -> list[tuple[str, datetime | None]]:
             items.append((title, dt))
         return items
     except Exception as exc:
-        log.warning("Economic news feed unavailable: %s", exc)
-        return []
+        log.warning("Economic news feed unavailable (%s): %s", url, exc)
+        return None
 
 
 def nfp_risk(now: datetime | None = None) -> NewsRisk:
-    """Detect NFP-related headlines in a +/- 24h window.
+    """Detect nearby NFP headlines without inventing a directional bias.
 
-    News is a risk filter, not a directional signal. If the feed is unavailable,
-    MercuryEdge continues with technical analysis rather than inventing news.
+    A successful RSS response only verifies that a headline feed responded; it
+    does not verify consensus forecasts, BLS actuals, unemployment, wages, or
+    revisions. Those values must remain explicitly unavailable until a trusted
+    structured source is integrated.
     """
     now = now or datetime.now(timezone.utc)
     feeds = [
@@ -52,14 +56,35 @@ def nfp_risk(now: datetime | None = None) -> NewsRisk:
         "https://www.dailyfx.com/feeds/forex.xml",
     ]
     keywords = ("nonfarm payroll", "non-farm payroll", "nfp", "employment report")
+    successful_feed = False
     for feed in feeds:
-        for title, published in _parse_rss(feed):
+        items = _parse_rss(feed)
+        if items is None:
+            continue
+        successful_feed = True
+        for title, published in items:
             lower = title.lower()
             if not any(keyword in lower for keyword in keywords):
                 continue
             if published is None or abs((published - now).total_seconds()) <= 24 * 3600:
-                return NewsRisk(True, "NFP RISK", title, published)
-    return NewsRisk(False, "NO NFP ALERT", "No nearby NFP headline detected")
+                return NewsRisk(
+                    True, "NFP RISK",
+                    f"{title} | Forecast/actual labor data: UNAVAILABLE (headline feed only)",
+                    published, True,
+                )
+
+    if not successful_feed:
+        return NewsRisk(
+            False, "NFP DATA UNAVAILABLE",
+            "Economic news feeds could not be reached; NFP event, forecast and actual data are unverified.",
+            None, False,
+        )
+
+    return NewsRisk(
+        False, "NO NFP HEADLINE DETECTED",
+        "Headline feeds responded, but no nearby NFP headline was found. This does not verify the economic calendar or forecast/actual figures.",
+        None, True,
+    )
 
 
 def should_reduce_risk(category: str, risk: NewsRisk) -> bool:
