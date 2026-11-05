@@ -56,6 +56,40 @@ Signal journal
 Telegram / console output
 ```
 
+## Optional Longbridge quote enrichment
+
+MercuryEdge can optionally fetch supplemental security quotes from Longbridge OpenAPI.
+This is a **quote-only context feed**: it does not replace the existing candle provider
+for FX or commodities, does not create or rank setups, and does not import or call
+Longbridge trading APIs.
+
+To enable it in an already-authenticated Codespaces runtime:
+
+```bash
+# List the OAuth client cache filenames (these are client IDs, not tokens).
+ls -1 ~/.longbridge/openapi/tokens
+
+# Set the client ID matching the MercuryEdge authorization.
+export LONGBRIDGE_OAUTH_CLIENT_ID="YOUR_CLIENT_ID"
+
+# Choose securities supported by your Longbridge account/quote permissions.
+export MERCURY_LONGBRIDGE_SYMBOLS="NVDA.US,AAPL.US"
+
+# Fetch a quote-only snapshot.
+python -m mercuryedge.longbridge_data
+```
+
+The main signal scan also logs these supplemental quotes when the two environment
+variables are set. Empty symbols keep the feature disabled. The timestamp recorded
+by MercuryEdge is the local observation time, not an exchange event timestamp.
+
+**Deployment limitation:** GitHub-hosted Actions runners are ephemeral and do not
+inherit the OAuth token cache from Codespaces. This change intentionally does not
+copy OAuth tokens into repository files or commit credentials. Scheduled Actions
+will continue using the existing FX/commodity data path until a durable, secure
+OAuth refresh-token store is configured and tested. Do not paste access or refresh
+tokens into source files, workflow YAML, issues, or chat.
+
 ## Backtesting
 
 Run a historical audit locally with:
