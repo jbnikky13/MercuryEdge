@@ -58,37 +58,83 @@ Telegram / console output
 
 ## Optional Longbridge quote enrichment
 
-MercuryEdge can optionally fetch supplemental security quotes from Longbridge OpenAPI.
-This is a **quote-only context feed**: it does not replace the existing candle provider
-for FX or commodities, does not create or rank setups, and does not import or call
-Longbridge trading APIs.
+MercuryEdge can optionally fetch supplemental security quotes through the authenticated Longbridge CLI.
 
-To enable it in an already-authenticated Codespaces runtime:
+This is a **quote-only context feed**. It does not replace the existing candle provider for FX or commodities, create or rank setups, or access Longbridge trading APIs.
+
+### Authenticate Longbridge
+
+Authenticate the Longbridge CLI in the runtime:
 
 ```bash
-# List the OAuth client cache filenames (these are client IDs, not tokens).
-ls -1 ~/.longbridge/openapi/tokens
+longbridge auth login
+longbridge check
+```
 
-# Set the client ID matching the MercuryEdge authorization.
-export LONGBRIDGE_OAUTH_CLIENT_ID="YOUR_CLIENT_ID"
+### Configure supported securities
 
-# Choose securities supported by your Longbridge account/quote permissions.
+Choose securities supported by your Longbridge account and quote permissions:
+
+```bash
 export MERCURY_LONGBRIDGE_SYMBOLS="NVDA.US,AAPL.US"
+```
 
-# Fetch a quote-only snapshot.
+Symbols use Longbridge format, such as:
+
+- `NVDA.US` — NVIDIA
+- `AAPL.US` — Apple
+- `700.HK` — Tencent
+
+The configured list is optional. An empty value keeps supplemental quotes disabled.
+
+### Fetch quote snapshots
+
+Fetch a quote-only snapshot for the configured securities:
+
+```bash
 python -m mercuryedge.longbridge_data
 ```
 
-The main signal scan also logs these supplemental quotes when the two environment
-variables are set. Empty symbols keep the feature disabled. The timestamp recorded
-by MercuryEdge is the local observation time, not an exchange event timestamp.
+The command invokes:
 
-**Deployment limitation:** GitHub-hosted Actions runners are ephemeral and do not
-inherit the OAuth token cache from Codespaces. This change intentionally does not
-copy OAuth tokens into repository files or commit credentials. Scheduled Actions
-will continue using the existing FX/commodity data path until a durable, secure
-OAuth refresh-token store is configured and tested. Do not paste access or refresh
-tokens into source files, workflow YAML, issues, or chat.
+```bash
+longbridge quote NVDA.US AAPL.US --format json
+```
+
+The actual symbols are determined by `MERCURY_LONGBRIDGE_SYMBOLS`.
+
+The returned JSON can include:
+
+- Last traded price
+- Previous close
+- Opening, high and low prices
+- Trading volume and turnover
+- Trading status
+- Pre-market quote data, when available
+- Post-market quote data, when available
+- Overnight quote data, when available
+
+### Timestamp handling
+
+Extended-hours timestamps supplied by Longbridge are retained as provider timestamps.
+
+The separate `observed_at_utc` field records when MercuryEdge received the quote. It must not be interpreted as the exchange event timestamp.
+
+### Integration boundaries
+
+The main MercuryEdge signal scan logs supplemental Longbridge quotes when `MERCURY_LONGBRIDGE_SYMBOLS` is configured.
+
+Longbridge quotes are contextual data only. They do not replace existing FX or commodity candle sources, create trading setups, change setup ranking, or modify signal scoring.
+
+The adapter invokes the authenticated Longbridge CLI. It does not read, copy, or expose the CLI credential file and does not access trading or order-placement APIs.
+
+### Deployment limitation
+
+GitHub-hosted Actions runners are ephemeral and do not inherit the authenticated CLI session from Codespaces.
+
+This integration does not configure hosted Actions authentication. Scheduled Actions will continue using the existing FX and commodity data path until a durable, secure Longbridge authentication approach is designed and tested.
+
+Never copy CLI credentials, access tokens, refresh tokens, or authorization codes into source files, workflow YAML, issues, or chat.
 
 ## Backtesting
 
