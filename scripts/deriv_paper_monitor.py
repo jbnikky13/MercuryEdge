@@ -88,7 +88,7 @@ def update_ledger(frames: dict[str, pd.DataFrame], ledger: pd.DataFrame) -> pd.D
         for idx in existing.index[mask]:
             entry_time = pd.Timestamp(existing.at[idx, "entry_time"])
             pos = positions.get(entry_time.isoformat())
-            if pos is None or pos + HORIZON_HOURS > len(x) - 1:
+            if pos is None or pos + HORIZON_HOURS > len(x):
                 continue
             future = x.iloc[pos:pos + HORIZON_HOURS]
             gross = _settle(str(existing.at[idx, "direction"]),
