@@ -117,6 +117,12 @@ def _settle(direction: str, entry: float, risk: float, future: pd.DataFrame) -> 
     side = 1.0 if direction == "BUY" else -1.0
     stop, target = entry - side * risk, entry + side * risk * 1.6
     for _, bar in future.iterrows():
+        # Model gap-through-stop at the worse opening price; do not cap every stop
+        # loss at exactly -1R when the next candle opens beyond the stop.
+        if direction == "BUY" and bar.Open <= stop:
+            return float((bar.Open - entry) / risk)
+        if direction == "SELL" and bar.Open >= stop:
+            return float((entry - bar.Open) / risk)
         stop_hit = bar.Low <= stop if direction == "BUY" else bar.High >= stop
         target_hit = bar.High >= target if direction == "BUY" else bar.Low <= target
         if stop_hit:  # conservative tie-break when intrabar order is unknowable
@@ -153,12 +159,16 @@ def build_trades(frame: pd.DataFrame, symbol: str, cutoff: pd.Timestamp = HOLDOU
             future = x.iloc[i + 1:i + 1 + horizon]
             if len(future) != horizon:
                 continue
+            # Signal is confirmed at this candle's close; earliest defensible
+            # OHLC fill proxy is the next candle's open, not the signal close.
+            entry = float(future.Open.iloc[0])
             rows.append({
                 "strategy": strategy, "symbol": symbol, "ts": ts.isoformat(),
                 "direction": direction, "regime": row.REGIME, "vol_regime": row.VOL_REGIME,
                 "adx": float(row.ADX), "atr_rank": float(row.ATR_RANK),
-                "stop_atr": stop_mult, "entry": float(row.Close), "risk_points": risk,
-                "gross_R": _settle(direction, float(row.Close), risk, future),
+                "stop_atr": stop_mult, "signal_close": float(row.Close),
+                "entry": entry, "risk_points": risk,
+                "gross_R": _settle(direction, entry, risk, future),
             })
     return pd.DataFrame(rows)
 
