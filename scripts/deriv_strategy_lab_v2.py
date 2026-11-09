@@ -195,20 +195,22 @@ def evaluate_holdout(trades: pd.DataFrame, specs: dict[str, dict],
             continue
         for multiplier in COST_MULTIPLIERS:
             costs = group.risk_points.astype(float).rdiv(float(spec["min_spread"])) * multiplier
-            net = group.gross_R.astype(float) - costs
-            block_stats = []
-            for block, idx in group.groupby("block").groups.items():
-                positions = group.index.get_indexer(idx)
-                vals = net.iloc[positions]
+            group_net = group.gross_R.astype(float) - costs
+            block_means = []
+            # Count every completed calendar block, including blocks with zero trades.
+            # Otherwise sparse strategies could look consistent by skipping quiet months.
+            for block in range(complete_blocks):
+                mask = group.block == block
+                vals = group_net.loc[mask]
                 stats = _metrics(vals)
-                block_stats.append(stats["mean_net_R"])
-                block_rows.append({"strategy": strategy, "symbol": symbol, "cost_spread_multiple": multiplier,
-                                   "block": int(block), **stats})
-            stats = _metrics(net)
-            positive_share = float(sum(x is not None and x > 0 for x in block_stats) / len(block_stats)) if block_stats else 0.0
+                block_means.append(stats["mean_net_R"])
+                block_rows.append({"strategy": strategy, "symbol": symbol,
+                                   "cost_spread_multiple": multiplier, "block": block, **stats})
+            stats = _metrics(group_net)
+            positive_share = sum(x is not None and x > 0 for x in block_means) / complete_blocks if complete_blocks else 0.0
             summary_rows.append({"strategy": strategy, "symbol": symbol, "cost_spread_multiple": multiplier,
-                                 **stats, "complete_blocks": len(block_stats),
-                                 "positive_block_share": round(positive_share, 3)})
+                                 **stats, "complete_blocks": complete_blocks,
+                                 "positive_block_share": round(float(positive_share), 3)})
     blocks = pd.DataFrame(block_rows)
     summary = pd.DataFrame(summary_rows)
     report = {
