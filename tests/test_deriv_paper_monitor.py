@@ -20,12 +20,16 @@ def test_empty_ledger_report_is_shadow_only_and_never_eligible():
     assert report["orders_placed"] is False
 
 
-def test_ledger_columns_are_stable_and_holdout_cutoff_is_respected():
+def test_ledger_columns_are_stable_and_holdout_cutoff_is_respected(monkeypatch):
+    import scripts.deriv_paper_monitor as monitor
+
+    monkeypatch.setattr(monitor, "_direction", lambda strategy, row, prev: "BUY")
     ledger = pd.DataFrame(columns=LEDGER_COLUMNS)
-    result = update_ledger({"R_10": _frame()}, ledger)
+    # Start far enough back for indicator warm-up and extend beyond the frozen cutoff.
+    result = update_ledger({"R_10": _frame(800)}, ledger)
     assert list(result.columns) == LEDGER_COLUMNS
-    if not result.empty:
-        assert (pd.to_datetime(result.signal_time, utc=True) > HOLDOUT_START).all()
+    assert not result.empty
+    assert (pd.to_datetime(result.signal_time, utc=True) > HOLDOUT_START).all()
 
 
 def test_report_counts_open_and_closed_without_claiming_live_execution():
