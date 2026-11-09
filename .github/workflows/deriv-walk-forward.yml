@@ -1,0 +1,64 @@
+name: Deriv synthetic walk-forward validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated active Deriv synthetic symbols"
+        required: false
+        default: "R_10,R_25,R_50,R_75,R_100"
+      count:
+        description: "Number of hourly candles per symbol (max 5000)"
+        required: false
+        default: "5000"
+      horizon:
+        description: "Forward hourly candles per setup"
+        required: false
+        default: "24"
+      train_days:
+        description: "Chronological training window in days"
+        required: false
+        default: "90"
+      test_days:
+        description: "Unseen test window in days"
+        required: false
+        default: "30"
+      step_days:
+        description: "Days to advance between test windows"
+        required: false
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Test Deriv walk-forward research
+        run: python -m pytest tests/test_deriv_walk_forward.py -q
+      - name: Run read-only chronological validation
+        run: >-
+          python -m scripts.deriv_walk_forward
+          --symbols "${{ inputs.symbols }}"
+          --count "${{ inputs.count }}"
+          --granularity 3600
+          --horizon "${{ inputs.horizon }}"
+          --train-days "${{ inputs.train_days }}"
+          --test-days "${{ inputs.test_days }}"
+          --step-days "${{ inputs.step_days }}"
+      - name: Upload research report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deriv-walk-forward-report
+          path: research_data/deriv-walk-forward/
+          if-no-files-found: warn
