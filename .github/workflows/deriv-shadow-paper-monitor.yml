@@ -1,0 +1,79 @@
+name: Deriv hourly shadow paper monitor
+
+on:
+  schedule:
+    - cron: "2 * * * *"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Deriv synthetic symbols"
+        required: false
+        default: "R_10,R_25,R_50,R_75,R_100"
+      count:
+        description: "Hourly candles per symbol (max 5000)"
+        required: false
+        default: "5000"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deriv-shadow-paper-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Test shadow monitor
+        run: python -m pytest tests/test_deriv_paper_monitor.py tests/test_deriv_strategy_lab_v2.py -q
+      - name: Update shadow paper ledger
+        env:
+          SYMBOLS: ${{ inputs.symbols || 'R_10,R_25,R_50,R_75,R_100' }}
+          COUNT: ${{ inputs.count || '5000' }}
+        run: |
+          python -m scripts.deriv_paper_monitor --symbols "$SYMBOLS" --count "$COUNT"
+      - name: Persist ledger
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research_data/deriv-shadow-paper/ledger.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update Deriv shadow paper ledger"
+            git push origin HEAD:main
+          else
+            echo "No ledger changes to persist."
+          fi
+      - name: Publish report in workflow summary
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("research_data/deriv-shadow-paper/report.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write("## Deriv shadow paper monitor\n")
+              out.write("\n")
+              out.write(f"- Signals recorded: {report['signals_recorded']}\n")
+              out.write(f"- Open: {report['open_signals']} | Closed: {report['closed_signals']}\n")
+              out.write("- Paper eligible: **No**\n")
+              out.write("- Orders placed: **No**\n")
+          PY
+      - name: Upload shadow report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deriv-shadow-paper-report
+          path: research_data/deriv-shadow-paper/
+          if-no-files-found: warn
