@@ -1,0 +1,29 @@
+name: Deriv public market-data smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "mercuryedge/deriv_data.py"
+      - "scripts/deriv_public_smoke_test.py"
+      - ".github/workflows/deriv-public-smoke.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  public-market-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Verify Deriv public synthetic data
+        run: python -m scripts.deriv_public_smoke_test

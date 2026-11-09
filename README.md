@@ -1,6 +1,6 @@
 # MercuryEdge
 
-Technical-analysis trade setup engine for **Forex and Commodities**.
+Technical-analysis trade setup engine for **Forex and Commodities**, with an experimental read-only Deriv synthetic-market data adapter.
 
 MercuryEdge is a signal-only research system. It does not place trades or connect to a broker for execution.
 
@@ -23,6 +23,36 @@ EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, NZDUSD, USDCAD, EURGBP, EURJPY, GBPJPY, 
 
 ### Commodities
 XAUUSD, XAGUSD, USOIL, UKOIL, NATGAS, COPPER
+
+## Experimental Deriv synthetic market data
+
+MercuryEdge includes an isolated, read-only adapter for Deriv's public market-data WebSocket. It uses unauthenticated market-data requests to discover active symbols and retrieve historical OHLC candles. It does not require a Deriv account token and does not submit trades.
+
+Install the project requirements, then run:
+
+```bash
+python -m mercuryedge.deriv_data
+```
+
+The command prints synthetic instruments classified as synthetic by Deriv's returned market metadata. Symbol names are discovered dynamically; Headway symbols must not be assumed to match Deriv symbols.
+
+Retrieve candles from Python:
+
+```python
+from mercuryedge.deriv_data import DerivPublicClient, get_candles, get_synthetic_symbols
+
+symbols = get_synthetic_symbols()
+if symbols:
+    symbol = DerivPublicClient.symbol_code(symbols[0])
+    candles = get_candles(symbol, count=500, granularity=300)
+    print(symbol, candles.tail())
+```
+
+Supported candle granularities are 1, 2, 3, 5, 10, 15, 30 minutes and 1, 2, 4, 24 hours. The adapter normalizes timestamps to UTC and returns OHLC columns.
+
+**Integration status:** data adapter only. It is not connected to the production signal pipeline or Telegram scheduler. Do not treat discovered symbols or retrieved candles as validated trade setups. Strategy research, data-quality checks, walk-forward validation and paper testing are required before signal publication.
+
+The adapter uses the public endpoint documented by Deriv. Public market-data access does not expose account balances or trading operations. See the [Deriv API documentation](https://developers.deriv.com/docs/data/active-symbols/) and [public WebSocket overview](https://developers.deriv.com/docs/intro/api-overview/).
 
 ## Market timing
 
@@ -164,7 +194,7 @@ python -m mercuryedge
 Windows PowerShell:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+.venv\\Scripts\\Activate.ps1
 ```
 
 ## Configuration
