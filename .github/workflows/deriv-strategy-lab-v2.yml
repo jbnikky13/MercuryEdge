@@ -1,0 +1,45 @@
+name: Deriv synthetic strategy lab v2
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Deriv synthetic symbols"
+        required: false
+        default: "R_10,R_25,R_50,R_75,R_100"
+      count:
+        description: "Hourly candles per symbol (max 5000)"
+        required: false
+        default: "5000"
+
+permissions:
+  contents: read
+
+jobs:
+  prospective-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Test v2 research engine
+        run: python -m pytest tests/test_deriv_strategy_lab_v2.py -q
+      - name: Run prospective untouched holdout
+        run: >-
+          python -m scripts.deriv_strategy_lab_v2
+          --symbols "${{ inputs.symbols }}"
+          --count "${{ inputs.count }}"
+      - name: Upload prospective research report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deriv-strategy-lab-v2-report
+          path: research_data/deriv-strategy-lab-v2/
+          if-no-files-found: warn
