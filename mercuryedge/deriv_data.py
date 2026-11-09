@@ -9,6 +9,7 @@ import websocket
 
 PUBLIC_WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public"
 SYNTHETIC_MARKETS = {"synthetic_index", "synthetic indices", "synthetic"}
+HISTORY_PAGE_SIZE = 1000
 
 
 class DerivAPIError(RuntimeError):
@@ -78,7 +79,7 @@ class DerivPublicClient:
         return result
 
     def candles(self, symbol: str, count: int = 500, granularity: int = 300) -> pd.DataFrame:
-        """Fetch OHLC candles and return a UTC-indexed DataFrame."""
+        """Fetch up to 5,000 OHLC candles, paging backwards in 1,000-candle chunks."""
         if not isinstance(symbol, str) or not symbol.strip():
             raise ValueError("symbol must be a non-empty string")
         if count < 2 or count > 5000:
@@ -87,39 +88,63 @@ class DerivPublicClient:
         if granularity not in allowed:
             raise ValueError("unsupported candle granularity")
 
-        response = self._request({
-            "ticks_history": symbol,
-            "adjust_start_time": 1,
-            "count": count,
-            "end": "latest",
-            "granularity": granularity,
-            "style": "candles",
-        })
-        candles = response.get("candles")
-        if not isinstance(candles, list) or not candles:
-            raise DerivAPIError(f"Deriv returned no candle history for {symbol}")
+        pages: list[pd.DataFrame] = []
+        end: str | int = "latest"
+        remaining = count
+        previous_oldest: int | None = None
 
-        frame = pd.DataFrame(candles)
-        required = {"epoch", "open", "high", "low", "close"}
-        if not required.issubset(frame.columns):
-            raise DerivAPIError(f"Deriv candle response for {symbol} is malformed")
-        frame = frame.rename(columns={"epoch": "timestamp"})
-        frame["timestamp"] = pd.to_datetime(frame["timestamp"], unit="s", utc=True, errors="coerce")
-        for column in ("open", "high", "low", "close"):
-            frame[column] = pd.to_numeric(frame[column], errors="coerce")
-        frame = frame.dropna(subset=["timestamp", "open", "high", "low", "close"])
-        if frame.empty:
-            raise DerivAPIError(f"Deriv returned no valid OHLC candles for {symbol}")
-        invalid = (
-            (frame["high"] < frame[["open", "close", "low"]].max(axis=1))
-            | (frame["low"] > frame[["open", "close", "high"]].min(axis=1))
-        )
-        if invalid.any():
-            raise DerivAPIError(f"Deriv returned invalid OHLC relationships for {symbol}")
-        frame = frame.drop_duplicates(subset=["timestamp"], keep="last")
-        frame = frame.set_index("timestamp").sort_index()
-        frame.index.name = "timestamp"
-        return frame[["open", "high", "low", "close"]]
+        while remaining > 0:
+            page_count = min(HISTORY_PAGE_SIZE, remaining)
+            response = self._request({
+                "ticks_history": symbol,
+                "adjust_start_time": 1,
+                "count": page_count,
+                "end": end,
+                "granularity": granularity,
+                "style": "candles",
+            })
+            candles = response.get("candles")
+            if not isinstance(candles, list) or not candles:
+                break
+
+            frame = pd.DataFrame(candles)
+            required = {"epoch", "open", "high", "low", "close"}
+            if not required.issubset(frame.columns):
+                raise DerivAPIError(f"Deriv candle response for {symbol} is malformed")
+            frame = frame.rename(columns={"epoch": "timestamp"})
+            frame["timestamp"] = pd.to_datetime(frame["timestamp"], unit="s", utc=True, errors="coerce")
+            for column in ("open", "high", "low", "close"):
+                frame[column] = pd.to_numeric(frame[column], errors="coerce")
+            frame = frame.dropna(subset=["timestamp", "open", "high", "low", "close"])
+            if frame.empty:
+                break
+            invalid = (
+                (frame["high"] < frame[["open", "close", "low"]].max(axis=1))
+                | (frame["low"] > frame[["open", "close", "high"]].min(axis=1))
+            )
+            if invalid.any():
+                raise DerivAPIError(f"Deriv returned invalid OHLC relationships for {symbol}")
+
+            pages.append(frame)
+            oldest = int(frame["timestamp"].min().timestamp())
+            if previous_oldest is not None and oldest >= previous_oldest:
+                raise DerivAPIError(f"Deriv history pagination made no backward progress for {symbol}")
+            previous_oldest = oldest
+            remaining = count - sum(len(page) for page in pages)
+            end = oldest - 1
+
+            # A short page means the provider has no more history for this request.
+            if len(frame) < page_count:
+                break
+
+        if not pages:
+            raise DerivAPIError(f"Deriv returned no valid candle history for {symbol}")
+        combined = pd.concat(pages, ignore_index=True)
+        combined = combined.drop_duplicates(subset=["timestamp"], keep="last")
+        combined = combined.sort_values("timestamp").tail(count)
+        combined = combined.set_index("timestamp")
+        combined.index.name = "timestamp"
+        return combined[["open", "high", "low", "close"]]
 
 
 def get_synthetic_symbols() -> list[dict[str, Any]]:
