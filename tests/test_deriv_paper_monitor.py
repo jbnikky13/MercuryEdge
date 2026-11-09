@@ -7,7 +7,7 @@ from scripts.deriv_strategy_lab_v2 import HOLDOUT_START
 
 
 def _frame(n=700):
-    idx = pd.date_range("2026-11-01", periods=n, freq="h", tz="UTC")
+    idx = pd.date_range("2026-10-10", periods=n, freq="h", tz="UTC")
     close = pd.Series(range(n), index=idx, dtype=float) + 100
     return pd.DataFrame({"Open": close - .2, "High": close + .5,
                          "Low": close - .5, "Close": close})
