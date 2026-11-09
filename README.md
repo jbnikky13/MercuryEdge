@@ -39,11 +39,11 @@ The command prints synthetic instruments classified as synthetic by Deriv's retu
 Retrieve candles from Python:
 
 ```python
-from mercuryedge.deriv_data import get_candles, get_synthetic_symbols
+from mercuryedge.deriv_data import DerivPublicClient, get_candles, get_synthetic_symbols
 
 symbols = get_synthetic_symbols()
 if symbols:
-    symbol = symbols[0]["symbol"]
+    symbol = DerivPublicClient.symbol_code(symbols[0])
     candles = get_candles(symbol, count=500, granularity=300)
     print(symbol, candles.tail())
 ```
