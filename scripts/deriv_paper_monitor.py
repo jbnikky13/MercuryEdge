@@ -40,13 +40,16 @@ def update_ledger(frames: dict[str, pd.DataFrame], ledger: pd.DataFrame) -> pd.D
     known = set(existing.trade_id.dropna().astype(str))
     additions: list[dict] = []
 
+    completed_cutoff = pd.Timestamp.now(tz="UTC").floor("h")
     for symbol, raw in frames.items():
-        x = _features(raw)
+        raw = raw.sort_index()
+        completed = raw[raw.index < completed_cutoff]
+        x = _features(completed)
         if len(x) < 302:
             continue
-        # The signal candle must be complete and the next candle must exist for
-        # a conservative next-open entry proxy.
-        for i in range(250, len(x) - 1):
+        # Evaluate only completed bars; use the following candle's recorded open
+        # as the next-bar entry proxy, even while that entry candle is forming.
+        for i in range(250, len(x)):
             signal_time = pd.Timestamp(x.index[i])
             if signal_time <= HOLDOUT_START:
                 continue
@@ -62,8 +65,10 @@ def update_ledger(frames: dict[str, pd.DataFrame], ledger: pd.DataFrame) -> pd.D
                 risk = float(row.ATR) * stop_mult
                 if not pd.notna(risk) or risk <= 0:
                     continue
-                entry_time = pd.Timestamp(x.index[i + 1])
-                entry = float(x.Open.iloc[i + 1])
+                entry_time = pd.Timestamp(x.index[i]) + pd.Timedelta(hours=1)
+                if entry_time not in raw.index:
+                    continue
+                entry = float(raw.loc[entry_time, "Open"])
                 side = 1.0 if direction == "BUY" else -1.0
                 additions.append({
                     "trade_id": trade_id, "strategy": strategy, "symbol": symbol,
@@ -83,6 +88,7 @@ def update_ledger(frames: dict[str, pd.DataFrame], ledger: pd.DataFrame) -> pd.D
     # Resolve open rows only when the full 24-candle outcome window is present.
     for symbol, raw in frames.items():
         x = raw.sort_index()
+        x = x[x.index < completed_cutoff]
         positions = {pd.Timestamp(ts).isoformat(): i for i, ts in enumerate(x.index)}
         mask = (existing.symbol == symbol) & (existing.status == "OPEN")
         for idx in existing.index[mask]:
@@ -167,11 +173,10 @@ def main() -> int:
     for symbol in symbols:
         raw = client.candles(symbol, count=args.count, granularity=3600)
         raw = raw.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
-        # Exclude the currently forming UTC hour to avoid repainting a signal.
         completed = raw[raw.index < pd.Timestamp.now(tz="UTC").floor("h")]
         if completed.empty:
             continue
-        frames[symbol] = completed
+        frames[symbol] = raw
         latest = max(latest, completed.index.max()) if latest is not None else completed.index.max()
         print(f"{symbol}: completed_hourly_candles={len(completed)} latest={completed.index.max().isoformat()}")
 
