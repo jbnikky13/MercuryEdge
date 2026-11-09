@@ -19,7 +19,7 @@ def test_features_are_lagged_and_regime_labels_are_defined():
 
 
 def test_settlement_uses_stop_first_when_both_levels_touched():
-    future = pd.DataFrame([{"High": 103.0, "Low": 97.0, "Close": 100.0}])
+    future = pd.DataFrame([{"Open": 100.0, "High": 103.0, "Low": 97.0, "Close": 100.0}])
     assert _settle("BUY", 100.0, 2.0, future) == -1.0
 
 
