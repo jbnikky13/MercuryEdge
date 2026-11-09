@@ -1,0 +1,40 @@
+name: Deriv synthetic strategy research
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated active Deriv synthetic symbols"
+        required: false
+        default: "R_10,R_25,R_50,R_75,R_100"
+      count:
+        description: "Number of hourly candles per symbol (max 5000)"
+        required: false
+        default: "5000"
+      horizon:
+        description: "Forward candles to evaluate"
+        required: false
+        default: "24"
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run read-only synthetic strategy research
+        run: >-
+          python -m scripts.deriv_synthetic_research
+          --symbols "${{ inputs.symbols }}"
+          --count "${{ inputs.count }}"
+          --granularity 3600
+          --horizon "${{ inputs.horizon }}"
