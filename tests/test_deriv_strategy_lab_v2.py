@@ -33,3 +33,21 @@ def test_holdout_is_strictly_after_frozen_cutoff_and_not_paper_eligible():
     _, _, report = evaluate_holdout(trades, spec, pd.Timestamp("2026-11-09T07:00:00Z"))
     assert report["status"] == "holdout_not_matured"
     assert report["paper_eligible"] is False
+
+
+def test_empty_holdout_blocks_count_as_non_positive():
+    from scripts.deriv_strategy_lab_v2 import evaluate_holdout
+
+    trades = pd.DataFrame([{
+        "strategy": "regime_pullback", "symbol": "R_10",
+        "ts": (HOLDOUT_START + pd.Timedelta(days=1)).isoformat(),
+        "gross_R": 1.6, "risk_points": 1.0,
+    }])
+    specs = {"R_10": {"min_spread": 0.001}}
+    _, summary, report = evaluate_holdout(
+        trades, specs, HOLDOUT_START + pd.Timedelta(days=120)
+    )
+    row = summary[(summary.cost_spread_multiple == 2.0)].iloc[0]
+    assert report["complete_30_day_blocks"] == 4
+    assert row.complete_blocks == 4
+    assert row.positive_block_share == 0.25
