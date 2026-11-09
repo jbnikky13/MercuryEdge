@@ -2,7 +2,7 @@ name: Deriv hourly shadow paper monitor
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "2 * * * *"
   workflow_dispatch:
     inputs:
       symbols:
