@@ -63,7 +63,7 @@ jobs:
           from pathlib import Path
           report = json.loads(Path("research_data/deriv-shadow-paper/report.json").read_text())
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-              out.write("## Deriv shadow paper monitor\\n")
+              out.write("## Deriv shadow paper monitor\n")
               out.write("\n")
               out.write(f"- Signals recorded: {report['signals_recorded']}\n")
               out.write(f"- Open: {report['open_signals']} | Closed: {report['closed_signals']}\n")
