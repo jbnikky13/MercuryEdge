@@ -51,3 +51,8 @@ def test_empty_holdout_blocks_count_as_non_positive():
     assert report["complete_30_day_blocks"] == 4
     assert row.complete_blocks == 4
     assert row.positive_block_share == 0.25
+
+
+def test_stop_gap_is_worse_than_one_r():
+    future = pd.DataFrame([{"Open": 96.0, "High": 98.0, "Low": 95.0, "Close": 97.0}])
+    assert _settle("BUY", 100.0, 2.0, future) == -2.0
