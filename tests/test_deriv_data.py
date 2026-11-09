@@ -60,6 +60,31 @@ def test_candles_are_normalized_to_utc_ohlc(monkeypatch):
     assert fake.sent["style"] == "candles"
 
 
+def test_candles_page_backwards_when_provider_caps_each_response(monkeypatch):
+    client = DerivPublicClient()
+    requests = []
+    pages = [
+        [{"epoch": epoch, "open": 100, "high": 102, "low": 99, "close": 101}
+         for epoch in range(2_000, 3_000)],
+        [{"epoch": epoch, "open": 100, "high": 102, "low": 99, "close": 101}
+         for epoch in range(800, 1_000)],
+    ]
+
+    def fake_request(payload):
+        requests.append(payload)
+        return {"candles": pages[len(requests) - 1]}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    frame = client.candles("R_100", count=1200, granularity=3600)
+
+    assert len(frame) == 1200
+    assert requests[0]["count"] == 1000
+    assert requests[0]["end"] == "latest"
+    assert requests[1]["count"] == 200
+    assert requests[1]["end"] == 1999
+    assert frame.index.is_monotonic_increasing
+
+
 def test_api_errors_are_raised(monkeypatch):
     fake = FakeConnection({"req_id": 1, "error": {"message": "Invalid symbol"}})
     monkeypatch.setattr("mercuryedge.deriv_data.websocket.create_connection", lambda *a, **k: fake)
