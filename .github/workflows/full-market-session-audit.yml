@@ -1,0 +1,55 @@
+name: MercuryEdge Full-Market Session Audit
+
+on:
+  schedule:
+    # 01:15 WAT on Tuesday-Saturday, auditing the previous WAT calendar day.
+    - cron: "15 0 * * 2-6"
+  workflow_dispatch:
+    inputs:
+      session_date:
+        description: "Session date in Africa/Lagos (YYYY-MM-DD); blank = previous WAT day"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mercuryedge-full-market-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Select completed WAT session
+        id: session
+        env:
+          REQUESTED_DATE: ${{ inputs.session_date }}
+        run: |
+          if [ -n "$REQUESTED_DATE" ]; then
+            echo "date=$REQUESTED_DATE" >> "$GITHUB_OUTPUT"
+          else
+            echo "date=$(TZ=Africa/Lagos date -d 'yesterday' +%F)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Collect all configured markets and grade journal signals
+        env:
+          MERCURY_SESSION_DATE: ${{ steps.session.outputs.date }}
+        run: python research/session_audit.py
+      - name: Upload session audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: mercuryedge-full-market-session-${{ steps.session.outputs.date }}
+          path: research_data/session_audit/
+          if-no-files-found: error
+          retention-days: 30
