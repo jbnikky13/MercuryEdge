@@ -29,6 +29,9 @@ def format_signal(name: str, category: str, setup: dict) -> str:
         + setup.get("adaptive_crossmarket_modifier", 0)
         + setup.get("adaptive_agreement_modifier", 0)
     )
+    usd_exposed = setup.get("usd_exposed", False)
+    nfp_status = setup.get("nfp_data_status", "UNAVAILABLE")
+    nfp_reason = setup.get("nfp_data_reason", "No verified NFP data supplied.")
     return "\n".join(
         [
             f"{icon} {category.upper()} SETUP",
@@ -62,6 +65,12 @@ def format_signal(name: str, category: str, setup: dict) -> str:
                 else "ENTRY STRETCH FROM EMA20. N/A"
             ),
             "Quality gates: ADX, 4H trend alignment, currency exposure and duplicate/feed checks.",
+            "",
+            "NFP / USD EVENT CONTEXT",
+            f"USD EXPOSURE. {'YES — EVENT SENSITIVE' if usd_exposed else 'NOT DIRECTLY IDENTIFIED'}",
+            f"NFP DATA STATUS. {nfp_status}",
+            f"NFP NOTE. {nfp_reason}",
+            "No forecast or actual labor figure is inferred from headline-only feeds.",
             "",
             "HISTORICAL INTELLIGENCE",
             f"3D HIT RATE: {history_rate}",

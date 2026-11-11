@@ -221,7 +221,7 @@ def main() -> None:
             )
         )
 
-        if should_reduce_risk(market.category, news):
+        if should_reduce_risk(market.category, news, market.name):
             result["score"] = max(0, result["score"] - 8)
             result["news_risk"] = news.label
 
@@ -355,6 +355,14 @@ def main() -> None:
         market = item["_market"]
         setup = item["_setup"]
         frame = item["_frame"]
+        setup["usd_exposed"] = "USD" in market.name
+        setup["nfp_data_status"] = (
+            "HEADLINE ONLY — FORECAST/ACTUAL UNAVAILABLE"
+            if news.high_impact else
+            "FEED UNAVAILABLE" if not news.data_available else
+            "NO NFP HEADLINE — CALENDAR/FIGURES UNVERIFIED"
+        )
+        setup["nfp_data_reason"] = news.reason
 
         features = build_features(
             market.name,
