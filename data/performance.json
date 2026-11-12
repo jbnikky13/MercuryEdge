@@ -2,50 +2,50 @@
   "factors": {
     "agreement": {
       "HIGH": {
-        "average_r": 0.4987,
-        "median_r": -1.0,
-        "resolved": 39,
-        "signals": 39,
+        "average_r": 0.5305,
+        "median_r": 1.15,
+        "resolved": 41,
+        "signals": 41,
         "sl": 20,
-        "tp1": 3,
+        "tp1": 5,
         "tp2": 16,
         "unresolved": 0,
-        "win_rate": 0.4872
+        "win_rate": 0.5122
       },
       "LOW": {
-        "average_r": -0.0937,
+        "average_r": -0.1069,
         "median_r": -1.0,
-        "resolved": 136,
-        "signals": 136,
-        "sl": 93,
+        "resolved": 138,
+        "signals": 138,
+        "sl": 95,
         "tp1": 15,
         "tp2": 28,
         "unresolved": 0,
-        "win_rate": 0.3162
+        "win_rate": 0.3116
       }
     },
     "category": {
       "commodity": {
-        "average_r": -0.1397,
+        "average_r": -0.0768,
         "median_r": -1.0,
-        "resolved": 39,
-        "signals": 39,
+        "resolved": 41,
+        "signals": 41,
         "sl": 28,
-        "tp1": 2,
+        "tp1": 4,
         "tp2": 9,
         "unresolved": 0,
-        "win_rate": 0.2821
+        "win_rate": 0.3171
       },
       "forex": {
-        "average_r": 0.2286,
+        "average_r": 0.2067,
         "median_r": -1.0,
-        "resolved": 110,
-        "signals": 110,
-        "sl": 63,
+        "resolved": 112,
+        "signals": 112,
+        "sl": 65,
         "tp1": 16,
         "tp2": 31,
         "unresolved": 0,
-        "win_rate": 0.4273
+        "win_rate": 0.4196
       },
       "index": {
         "average_r": -0.5,
@@ -61,15 +61,15 @@
     },
     "crossmarket": {
       "NEUTRAL": {
-        "average_r": -0.0776,
+        "average_r": -0.0735,
         "median_r": -1.0,
-        "resolved": 143,
-        "signals": 143,
-        "sl": 97,
-        "tp1": 16,
+        "resolved": 147,
+        "signals": 147,
+        "sl": 99,
+        "tp1": 18,
         "tp2": 30,
         "unresolved": 0,
-        "win_rate": 0.3217
+        "win_rate": 0.3265
       },
       "POSITIVE": {
         "average_r": 0.5563,
@@ -85,26 +85,26 @@
     },
     "direction": {
       "BUY": {
-        "average_r": 0.0173,
+        "average_r": 0.0053,
         "median_r": -1.0,
-        "resolved": 84,
-        "signals": 84,
-        "sl": 55,
+        "resolved": 85,
+        "signals": 85,
+        "sl": 56,
         "tp1": 8,
         "tp2": 21,
         "unresolved": 0,
-        "win_rate": 0.3452
+        "win_rate": 0.3412
       },
       "SELL": {
-        "average_r": 0.0577,
+        "average_r": 0.0697,
         "median_r": -1.0,
-        "resolved": 91,
-        "signals": 91,
-        "sl": 58,
-        "tp1": 10,
+        "resolved": 94,
+        "signals": 94,
+        "sl": 59,
+        "tp1": 12,
         "tp2": 23,
         "unresolved": 0,
-        "win_rate": 0.3626
+        "win_rate": 0.3723
       }
     },
     "historical": {
@@ -120,15 +120,15 @@
         "win_rate": 0.0
       },
       "NEUTRAL": {
-        "average_r": -0.0185,
+        "average_r": -0.0154,
         "median_r": -1.0,
-        "resolved": 119,
-        "signals": 119,
-        "sl": 79,
-        "tp1": 12,
+        "resolved": 123,
+        "signals": 123,
+        "sl": 81,
+        "tp1": 14,
         "tp2": 28,
         "unresolved": 0,
-        "win_rate": 0.3361
+        "win_rate": 0.3415
       },
       "POSITIVE": {
         "average_r": 0.2019,
@@ -144,15 +144,15 @@
     }
   },
   "overall": {
-    "average_r": 0.0383,
+    "average_r": 0.0391,
     "median_r": -1.0,
-    "resolved": 175,
-    "signals": 175,
-    "sl": 113,
-    "tp1": 18,
+    "resolved": 179,
+    "signals": 179,
+    "sl": 115,
+    "tp1": 20,
     "tp2": 44,
     "unresolved": 0,
-    "win_rate": 0.3543
+    "win_rate": 0.3575
   },
   "version": 1
 }
