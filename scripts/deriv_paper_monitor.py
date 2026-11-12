@@ -117,35 +117,118 @@ def update_ledger(frames: dict[str, pd.DataFrame], ledger: pd.DataFrame) -> pd.D
     ).reset_index(drop=True)
 
 
+def _overlap_flags(group: pd.DataFrame) -> pd.Series:
+    """Mark the first trade in each non-overlapping strategy/symbol interval.
+
+    A later signal whose 24-hour outcome interval intersects an earlier one is
+    retained in the ledger but is not counted as independent evidence.
+    """
+    ordered = group.copy()
+    ordered["_entry"] = pd.to_datetime(ordered["entry_time"], utc=True, errors="coerce")
+    closed_at = pd.to_datetime(ordered["closed_time"], utc=True, errors="coerce")
+    ordered["_end"] = closed_at.fillna(
+        ordered["_entry"] + pd.Timedelta(hours=HORIZON_HOURS)
+    )
+    ordered = ordered.sort_values(["_entry", "trade_id"], kind="stable")
+    flags = pd.Series(False, index=ordered.index, dtype=bool)
+    cluster_end = None
+    for idx, row in ordered.iterrows():
+        entry = row["_entry"]
+        finish = row["_end"]
+        if pd.isna(entry) or pd.isna(finish):
+            # Missing interval metadata cannot establish independence.
+            continue
+        if cluster_end is None or entry >= cluster_end:
+            flags.loc[idx] = True
+            cluster_end = finish
+        elif finish > cluster_end:
+            cluster_end = finish
+    return flags.reindex(group.index, fill_value=False)
+
+
 def build_report(ledger: pd.DataFrame, latest_candle: str) -> dict:
-    closed = ledger[ledger.status == "CLOSED"].copy() if not ledger.empty else ledger.copy()
-    strategies = []
-    for (strategy, symbol), group in closed.groupby(["strategy", "symbol"]) if not closed.empty else []:
-        row = {"strategy": strategy, "symbol": symbol,
-               "open_trades": int(((ledger.strategy == strategy) & (ledger.symbol == symbol) &
-                                   (ledger.status == "OPEN")).sum())}
+    data = ledger.copy()
+    if data.empty:
+        data = pd.DataFrame(columns=LEDGER_COLUMNS)
+    for col in LEDGER_COLUMNS:
+        if col not in data.columns:
+            data[col] = ""
+    data["_independent_evidence"] = False
+    group_results = []
+    overlap_groups = []
+
+    # Group from the full ledger, not just closed rows, so open-only strategies
+    # remain visible. Performance metrics below always use settled rows only.
+    for (strategy, symbol), group in data.groupby(["strategy", "symbol"], dropna=False, sort=True):
+        independent = _overlap_flags(group)
+        data.loc[group.index, "_independent_evidence"] = independent
+        closed = group[group.status == "CLOSED"].copy()
+        independent_closed = closed.loc[independent.reindex(closed.index, fill_value=False)]
+        row = {
+            "strategy": strategy, "symbol": symbol,
+            "open_trades": int((group.status == "OPEN").sum()),
+            "closed_trades": int(len(closed)),
+            "overlapping_signals": int((~independent).sum()),
+            "independent_signals": int(independent.sum()),
+        }
         for label, column in [
             ("1x_min_spread", "net_R_1x_min_spread"),
             ("1_5x_min_spread", "net_R_1_5x_min_spread"),
             ("2x_min_spread", "net_R_2x_min_spread"),
         ]:
-            row[label] = _metrics(pd.to_numeric(group[column], errors="coerce"))
-        strategies.append(row)
+            row[label] = _metrics(pd.to_numeric(closed[column], errors="coerce"))
+            row[f"{label}_independent_only"] = _metrics(
+                pd.to_numeric(independent_closed[column], errors="coerce")
+            )
+        group_results.append(row)
+        overlap_groups.append({
+            "strategy": strategy, "symbol": symbol,
+            "signals": int(len(group)),
+            "independent_signals": int(independent.sum()),
+            "overlapping_signals": int((~independent).sum()),
+            "independent_closed_signals": int(len(independent_closed)),
+        })
+
+    closed_all = data[data.status == "CLOSED"]
+    independent_closed_all = data[
+        (data.status == "CLOSED") & data["_independent_evidence"]
+    ]
+    overall = {}
+    for label, column in [
+        ("1x_min_spread", "net_R_1x_min_spread"),
+        ("1_5x_min_spread", "net_R_1_5x_min_spread"),
+        ("2x_min_spread", "net_R_2x_min_spread"),
+    ]:
+        overall[label] = _metrics(pd.to_numeric(closed_all[column], errors="coerce"))
+        overall[f"{label}_independent_only"] = _metrics(
+            pd.to_numeric(independent_closed_all[column], errors="coerce")
+        )
+
     return {
         "status": "shadow_monitoring",
         "latest_completed_candle_utc": latest_candle,
         "holdout_start_utc": HOLDOUT_START.isoformat(),
-        "signals_recorded": int(len(ledger)),
-        "open_signals": int((ledger.status == "OPEN").sum()) if not ledger.empty else 0,
-        "closed_signals": int((ledger.status == "CLOSED").sum()) if not ledger.empty else 0,
-        "strategy_symbol_results": strategies,
-        "cost_warning": "Published minimum spreads are scenario floors, not verified account-specific live execution costs. Slippage, commissions and swap conversion remain unverified.",
+        "signals_recorded": int(len(data)),
+        "open_signals": int((data.status == "OPEN").sum()),
+        "closed_signals": int((data.status == "CLOSED").sum()),
+        "overall_settled_results": overall,
+        "independence_warning": (
+            "Signals with overlapping 24-hour outcome intervals are retained, "
+            "but are not counted as independent evidence in the independent_only metrics."
+        ),
+        "overlap_analysis": {
+            "method": "chronological non-overlapping 24-hour intervals per strategy and symbol",
+            "independent_closed_signals": int(len(independent_closed_all)),
+            "overlapping_signals": int((~data["_independent_evidence"]).sum()),
+            "groups": overlap_groups,
+        },
+        "strategy_symbol_results": group_results,
+        "cost_warning": "Published minimum spreads are scenario floors, not verified account-specific live execution costs. OHLC next-candle-open entries are proxies, not guaranteed fills. Slippage, commissions and swap conversion remain unverified.",
         "paper_eligible": False,
         "production_rules_changed": False,
         "telegram_enabled": False,
         "orders_placed": False,
     }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Research-only Deriv shadow-paper monitor")
