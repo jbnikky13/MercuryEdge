@@ -1,5 +1,5 @@
 {
-  "fold_count": 5,
+  "fold_count": 6,
   "folds": [
     {
       "average_modifier": 0.0,
@@ -65,9 +65,22 @@
       "train_end": "2026-10-08 19:00:00+00:00",
       "train_samples": 60,
       "train_start": "2026-09-25 13:30:00+00:00"
+    },
+    {
+      "average_modifier": -0.45,
+      "selected_test_samples": 11,
+      "selected_test_win_rate": 0.2727,
+      "test_baseline_win_rate": 0.5,
+      "test_end": "2026-11-12 20:00:00+00:00",
+      "test_samples": 20,
+      "test_start": "2026-10-27 19:00:00+00:00",
+      "train_baseline_win_rate": 0.3,
+      "train_end": "2026-10-27 19:00:00+00:00",
+      "train_samples": 60,
+      "train_start": "2026-09-30 18:00:00+00:00"
     }
   ],
-  "mean_selected_test_win_rate": 0.3611,
+  "mean_selected_test_win_rate": 0.3464,
   "method": "rolling_train_then_unseen_test",
   "test_size": 20,
   "train_size": 60,
