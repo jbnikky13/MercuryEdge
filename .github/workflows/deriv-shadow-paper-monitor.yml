@@ -42,8 +42,8 @@ jobs:
         run: python -m pytest tests/test_deriv_paper_monitor.py tests/test_deriv_strategy_lab_v2.py -q
       - name: Update shadow paper ledger
         env:
-          SYMBOLS: \${{ inputs.symbols || 'R_10,R_25,R_50,R_75,R_100' }}
-          COUNT: \${{ inputs.count || '5000' }}
+          SYMBOLS: ${{ inputs.symbols || 'R_10,R_25,R_50,R_75,R_100' }}
+          COUNT: ${{ inputs.count || '5000' }}
         run: |
           python -m scripts.deriv_paper_monitor --symbols "$SYMBOLS" --count "$COUNT"
       - name: Persist ledger
