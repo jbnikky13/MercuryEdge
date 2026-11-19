@@ -300,7 +300,7 @@ def main() -> int:
     report = build_report(ledger, pd.Timestamp(latest).isoformat())
     (output / "report.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
     (output / "latest-ledger.csv").write_text(ledger.to_csv(index=False), encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2, allow_nan=False))
     return 0
 
 
