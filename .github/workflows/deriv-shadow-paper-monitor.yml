@@ -2,7 +2,7 @@ name: Deriv hourly shadow paper monitor
 
 on:
   schedule:
-    - cron: "2 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       symbols:
@@ -18,8 +18,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: deriv-shadow-paper-monitor
+  group: mercuryedge-main-writes
   cancel-in-progress: false
+  queue: max
 
 jobs:
   monitor:
@@ -67,6 +68,8 @@ jobs:
               out.write("\n")
               out.write(f"- Signals recorded: {report['signals_recorded']}\n")
               out.write(f"- Open: {report['open_signals']} | Closed: {report['closed_signals']}\n")
+              freshness = report["data_freshness"]
+              out.write(f"- Data freshness: **{freshness['status']}** ({freshness['age_minutes']} minutes old; 90-minute limit)\n")
               out.write("- Paper eligible: **No**\n")
               out.write("- Orders placed: **No**\n")
           PY

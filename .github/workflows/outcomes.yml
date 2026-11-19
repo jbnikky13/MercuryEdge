@@ -9,8 +9,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: mercuryedge-outcomes
+  group: mercuryedge-main-writes
   cancel-in-progress: false
+  queue: max
 
 jobs:
   outcomes:

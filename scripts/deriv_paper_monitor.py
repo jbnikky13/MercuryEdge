@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -146,7 +147,18 @@ def _overlap_flags(group: pd.DataFrame) -> pd.Series:
     return flags.reindex(group.index, fill_value=False)
 
 
-def build_report(ledger: pd.DataFrame, latest_candle: str) -> dict:
+def _json_safe(value):
+    """Replace non-finite floats with JSON null, recursively."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def build_report(ledger: pd.DataFrame, latest_candle: str, now=None) -> dict:
     data = ledger.copy()
     if data.empty:
         data = pd.DataFrame(columns=LEDGER_COLUMNS)
@@ -204,9 +216,27 @@ def build_report(ledger: pd.DataFrame, latest_candle: str) -> dict:
             pd.to_numeric(independent_closed_all[column], errors="coerce")
         )
 
-    return {
+    current_time = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+    if current_time.tzinfo is None:
+        current_time = current_time.tz_localize("UTC")
+    else:
+        current_time = current_time.tz_convert("UTC")
+    candle_time = pd.Timestamp(latest_candle)
+    if candle_time.tzinfo is None:
+        candle_time = candle_time.tz_localize("UTC")
+    else:
+        candle_time = candle_time.tz_convert("UTC")
+    age_minutes = max(0.0, (current_time - candle_time).total_seconds() / 60.0)
+
+    return _json_safe({
         "status": "shadow_monitoring",
-        "latest_completed_candle_utc": latest_candle,
+        "latest_completed_candle_utc": candle_time.isoformat(),
+        "data_freshness": {
+            "threshold_minutes": 90,
+            "age_minutes": round(age_minutes, 1),
+            "is_fresh": age_minutes <= 90,
+            "status": "fresh" if age_minutes <= 90 else "stale",
+        },
         "holdout_start_utc": HOLDOUT_START.isoformat(),
         "signals_recorded": int(len(data)),
         "open_signals": int((data.status == "OPEN").sum()),
@@ -228,7 +258,7 @@ def build_report(ledger: pd.DataFrame, latest_candle: str) -> dict:
         "production_rules_changed": False,
         "telegram_enabled": False,
         "orders_placed": False,
-    }
+    })
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Research-only Deriv shadow-paper monitor")
@@ -268,9 +298,9 @@ def main() -> int:
     ledger = update_ledger(frames, ledger)
     ledger.to_csv(ledger_path, index=False)
     report = build_report(ledger, pd.Timestamp(latest).isoformat())
-    (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (output / "report.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
     (output / "latest-ledger.csv").write_text(ledger.to_csv(index=False), encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2, allow_nan=False))
     return 0
 
 
