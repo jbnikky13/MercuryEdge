@@ -42,8 +42,8 @@ jobs:
         run: python -m pytest tests/test_deriv_paper_monitor.py tests/test_deriv_strategy_lab_v2.py -q
       - name: Update shadow paper ledger
         env:
-          SYMBOLS: ${{ inputs.symbols || 'R_10,R_25,R_50,R_75,R_100' }}
-          COUNT: ${{ inputs.count || '5000' }}
+          SYMBOLS: \${{ inputs.symbols || 'R_10,R_25,R_50,R_75,R_100' }}
+          COUNT: \${{ inputs.count || '5000' }}
         run: |
           python -m scripts.deriv_paper_monitor --symbols "$SYMBOLS" --count "$COUNT"
       - name: Persist ledger
@@ -64,14 +64,14 @@ jobs:
           from pathlib import Path
           report = json.loads(Path("research_data/deriv-shadow-paper/report.json").read_text())
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-              out.write("## Deriv shadow paper monitor\\n")
-              out.write("\\n")
-              out.write(f"- Signals recorded: {report['signals_recorded']}\\n")
-              out.write(f"- Open: {report['open_signals']} | Closed: {report['closed_signals']}\\n")
+              out.write("## Deriv shadow paper monitor\n")
+              out.write("\n")
+              out.write(f"- Signals recorded: {report['signals_recorded']}\n")
+              out.write(f"- Open: {report['open_signals']} | Closed: {report['closed_signals']}\n")
               freshness = report["data_freshness"]
-              out.write(f"- Data freshness: **{freshness['status']}** ({freshness['age_minutes']} minutes old; 90-minute limit)\\n")
-              out.write("- Paper eligible: **No**\\n")
-              out.write("- Orders placed: **No**\\n")
+              out.write(f"- Data freshness: **{freshness['status']}** ({freshness['age_minutes']} minutes old; 90-minute limit)\n")
+              out.write("- Paper eligible: **No**\n")
+              out.write("- Orders placed: **No**\n")
           PY
       - name: Upload shadow report
         if: always()
