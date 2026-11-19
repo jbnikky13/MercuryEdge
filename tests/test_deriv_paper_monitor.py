@@ -95,3 +95,35 @@ def test_overlapping_trades_are_retained_but_not_counted_as_independent():
     assert group["independent_signals"] == 2
     assert group["overlapping_signals"] == 1
     assert report["paper_eligible"] is False
+
+
+
+def test_report_normalizes_infinite_profit_factor_to_strict_json_null():
+    ledger = pd.DataFrame([
+        _report_trade("winner-1", "regime_breakout", "R_10",
+                      "2026-11-10T00:00:00+00:00", "2026-11-11T00:00:00+00:00", "CLOSED", 1.0),
+        _report_trade("winner-2", "regime_breakout", "R_10",
+                      "2026-11-12T00:00:00+00:00", "2026-11-13T00:00:00+00:00", "CLOSED", 2.0),
+    ])
+    report = build_report(ledger, "2026-11-13T00:00:00+00:00", now="2026-11-13T00:30:00+00:00")
+    metrics = report["strategy_symbol_results"][0]["1x_min_spread"]
+    assert metrics["profit_factor"] is None
+    encoded = json.dumps(report, allow_nan=False)
+    json.loads(encoded, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+
+
+def test_report_marks_candles_older_than_90_minutes_stale():
+    report = build_report(pd.DataFrame(columns=LEDGER_COLUMNS),
+                          "2026-11-13T00:00:00+00:00",
+                          now="2026-11-13T01:31:00+00:00")
+    assert report["data_freshness"]["age_minutes"] == 91.0
+    assert report["data_freshness"]["is_fresh"] is False
+    assert report["data_freshness"]["status"] == "stale"
+
+
+def test_report_marks_candles_within_90_minutes_fresh():
+    report = build_report(pd.DataFrame(columns=LEDGER_COLUMNS),
+                          "2026-11-13T00:00:00+00:00",
+                          now="2026-11-13T01:30:00+00:00")
+    assert report["data_freshness"]["is_fresh"] is True
+    assert report["data_freshness"]["status"] == "fresh"
